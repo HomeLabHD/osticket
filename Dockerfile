@@ -4,10 +4,10 @@
 # resurrected base chain, no s6 framework. All-in-one (nginx+php-fpm+cron) so it drops
 # into the existing single-container deployment, but UNPRIVILEGED: runs as uid 1000,
 # nginx binds 8080 (not 80), nothing needs root at runtime.
-FROM php:8.3-fpm-alpine
+FROM php:8.5.7-fpm-alpine3.23
 
 ARG OSTICKET_VERSION=1.18.4
-ARG OSTICKET_PLUGINS_VERSION=develop
+ARG OSTICKET_PLUGINS_VERSION=1.18.4
 ARG PUID=1000
 ARG PGID=1000
 
