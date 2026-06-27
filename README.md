@@ -1,6 +1,6 @@
 # 🎫 osticket
 
-A **rootless** container image for [osTicket](https://osticket.com/) — the open-source support-ticketing system — on a current, stock PHP runtime. Self-maintained because the popular `tiredofit/docker-osticket` image (and its whole base chain) was archived in October 2025, while osTicket itself stays actively developed (**v1.18.x**). Runs **unprivileged** (uid 1000, arbitrary-UID capable), all-in-one (nginx + php-fpm + cron), with the official **and** community plugin set bundled.
+A **rootless** container image for [osTicket](https://osticket.com/) — the open-source support-ticketing system — on a current, stock PHP runtime (**osTicket v1.18.x**, **PHP 8.3**). Runs **unprivileged** (uid 1000, arbitrary-UID capable), all-in-one (nginx + php-fpm + cron), with the official **and** community plugin set bundled.
 
 <!-- sf:project:start -->
 <!-- sf:project:end -->
@@ -56,7 +56,6 @@ osTicket needs a MySQL/MariaDB database and is configured **entirely from the en
 ## Credits
 
 * Powered by [osTicket](https://github.com/osTicket/osTicket) — the actively-maintained open-source ticketing system
-* Successor to the archived [tiredofit/docker-osticket](https://github.com/tiredofit/docker-osticket); the application lives on, the packaging didn't, so this rebuilds it rootless on a current base
 
 ## Disclaimer
 

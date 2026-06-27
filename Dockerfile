@@ -1,18 +1,19 @@
-# osTicket — rootless, self-owned image on a stock current base.
-# tiredofit/docker-osticket (and its whole debian base chain) was archived Oct 2025;
-# the osTicket *app* is alive (v1.18.4). We build on stock php:8.3-fpm-alpine — no
-# resurrected base chain, no s6 framework. All-in-one (nginx+php-fpm+cron) so it drops
-# into the existing single-container deployment, but UNPRIVILEGED: runs as uid 1000,
+# osTicket — rootless, self-owned image on a stock, current PHP base. All-in-one
+# (nginx + php-fpm + cron), but UNPRIVILEGED: runs as uid 1000 (arbitrary-UID capable),
 # nginx binds 8080 (not 80), nothing needs root at runtime.
-FROM php:8.5.7-fpm-alpine3.23
+#
+# PHP pinned to 8.3 ON PURPOSE: osTicket needs the imap extension, which was removed from
+# PHP core in 8.4 (8.4+ breaks `docker-php-ext-install imap`). The moving 8.3 tag
+# auto-patches within 8.3 each build; the dep updater must not bump the minor.
+FROM php:8.3-fpm-alpine
 
 ARG OSTICKET_VERSION=1.18.4
-ARG OSTICKET_PLUGINS_VERSION=1.18.4
+ARG OSTICKET_PLUGINS_VERSION=develop
 ARG PUID=1000
 ARG PGID=1000
 
 LABEL org.opencontainers.image.title="osticket" \
-      org.opencontainers.image.description="osTicket support ticketing — rootless, php-fpm+nginx, self-built (tiredofit upstream archived)" \
+      org.opencontainers.image.description="osTicket support ticketing — rootless, php-fpm+nginx, self-built" \
       org.opencontainers.image.source="https://gitlab.prplanit.com/HomeLabHD/osticket" \
       org.opencontainers.image.base.name="docker.io/library/php:8.3-fpm-alpine"
 

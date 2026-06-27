@@ -7,8 +7,8 @@ is what lets multiple replicas run against a single database.
 
 Two groups of variables:
 
-- **App contract** — the names the upstream `tiredofit/docker-osticket` image used, kept
-  identical so this image drops into an existing deployment unchanged.
+- **App contract** — the env-var names your existing deployment already uses, kept
+  identical so this image drops in unchanged.
 - **Image knobs** — added here for flexibility (listen port, DB port/prefix, PHP tunables).
 
 ---
