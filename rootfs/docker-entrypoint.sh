@@ -42,19 +42,17 @@ i=0; until db -e "SELECT 1" "${DB_NAME}" >/dev/null 2>&1; do
     sleep 2
 done
 
-# ── First-run install (idempotent across replicas). ─────────────────────────────────
-# install-seed.php drives osTicket's OWN Installer class headlessly: it writes
-# ost-config.php from the 1.18 sample, loads the schema, creates the admin (with
-# osTicket's password hashing) and the default config/emails — so the system comes up
-# INSTALLED, never on the setup wizard. It is idempotent (skips if already installed)
-# and is the single source of install truth (no separate SQL load here). The encryption
-# secret comes from INSTALL_SECRET so every replica shares one SECRET_SALT.
-if db -e "SELECT 1 FROM ${DB_PREFIX}config LIMIT 1" "${DB_NAME}" >/dev/null 2>&1; then
-    echo "[entrypoint] osTicket already installed — skipping install."
-else
-    echo "[entrypoint] installing osTicket into ${DB_NAME} ..."
-    php /var/www/install-seed.php
-    echo "[entrypoint] install complete."
-fi
+# ── Install / config refresh (idempotent + migration-safe across replicas). ──────────
+# install-seed.php is the single decision point — run it on EVERY boot, NOT gated by an
+# entrypoint-side "already installed?" check (which would skip the script and leave a
+# fresh container with no ost-config.php → setup wizard). It connects, ALWAYS (re)writes
+# ost-config.php from env (so an existing DB / replica restart / live migration gets the
+# env DB creds + the shared SECRET_SALT and serves the real app), and drives osTicket's
+# OWN Installer (schema + admin with proper password hashing + default config/emails)
+# ONLY when the DB is fresh. The encryption secret comes from INSTALL_SECRET so every
+# replica shares one SECRET_SALT.
+echo "[entrypoint] running install-seed (refreshes config; installs only if DB is fresh) ..."
+php /var/www/install-seed.php
+echo "[entrypoint] install-seed complete."
 
 exec "$@"

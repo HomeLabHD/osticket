@@ -99,15 +99,16 @@ ini_set('mysqli.default_port', $dbport);
 
 $installer = new Installer(OSTICKET_CONFIGFILE);
 
-// ── Idempotency: if the config table already exists, this DB is installed. ──────────
+// ── Connect + detect install state. We do NOT exit on already-installed: ost-config.php
+// must be (re)written from env on EVERY boot (DB creds + the shared SECRET_SALT) or
+// osTicket can't connect/decrypt and falls back to the setup wizard — this is the
+// migration / replica-restart case. Only the schema+admin install below is gated. ────
 seed_log("connecting to mysql://{$dbuser}@{$dbhost}:{$dbport}/{$dbname}");
 if (!db_connect($dbhost, $dbuser, $dbpass))
     seed_die('unable to connect to MySQL: ' . db_connect_error());
 
-if (db_select_database($dbname) && db_query('SELECT 1 FROM `' . $prefix . 'config` LIMIT 1', false)) {
-    seed_log("already installed (found {$prefix}config) — nothing to do.");
-    exit(0);
-}
+$installed = db_select_database($dbname)
+    && db_query('SELECT 1 FROM `' . $prefix . 'config` LIMIT 1', false);
 
 // ── Write ost-config.php from the 1.18 sample with the real placeholders filled. ────
 seed_log('writing ' . OSTICKET_CONFIGFILE . ' from sample');
@@ -135,7 +136,15 @@ if (@file_put_contents(OSTICKET_CONFIGFILE, $cfgtext) === false)
     seed_die('cannot write config file (is include/ group-writable?): ' . OSTICKET_CONFIGFILE);
 @chmod(OSTICKET_CONFIGFILE, 0640);
 
-// ── Run osTicket's own installer (schema + admin + defaults). ───────────────────────
+// ── Already installed (migration / restart): config was refreshed above from env; leave
+// the DB (schema, admin, SMTP) exactly as it is. This is what makes the image a safe
+// drop-in for an existing osTicket — it serves, it does not re-install or re-seed. ────
+if ($installed) {
+    seed_log("already installed (found {$prefix}config) — config refreshed, skipping schema/admin/SMTP seed.");
+    exit(0);
+}
+
+// ── Fresh DB: run osTicket's own installer (schema + admin + defaults). ──────────────
 seed_log('running osTicket Installer (schema + admin user + defaults)…');
 if (!$installer->install($vars)) {
     seed_log('install FAILED:');
