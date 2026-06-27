@@ -141,6 +141,7 @@ if (@file_put_contents(OSTICKET_CONFIGFILE, $cfgtext) === false)
 // drop-in for an existing osTicket — it serves, it does not re-install or re-seed. ────
 if ($installed) {
     seed_log("already installed (found {$prefix}config) — config refreshed, skipping schema/admin/SMTP seed.");
+    seed_enforce_external_cron($prefix);
     exit(0);
 }
 
@@ -153,6 +154,7 @@ if (!$installer->install($vars)) {
     exit(1);
 }
 seed_log('osTicket installed: schema loaded, admin "' . $vars['username'] . '" created.');
+seed_enforce_external_cron($prefix);
 
 // ── Best-effort: seed default system email outbound SMTP from SMTP_* env. ───────────
 // osTicket sends mail via the per-email SMTP account stored in the DB (no msmtp). This
@@ -208,4 +210,30 @@ function seed_seed_smtp($vars, $smtp_host) {
         $c->updateInfo(array('username' => $smtp_user, 'passwd' => $enc));
     }
     seed_log("SMTP seeded on <{$email->getEmail()}> → {$smtp_host}:{$smtp_port} ({$encryption})");
+}
+
+/**
+ * Enforce the deployment's "external cron only" contract: pin osTicket's enable_auto_cron
+ * to 0 so the web replicas NEVER fetch mail on page loads. osTicket has no distributed
+ * lock around mail fetch, so AutoCron + horizontal replicas = concurrent mailbox fetch =
+ * duplicate tickets. The single external CronJob owns all scheduled work.
+ *
+ * Runs on EVERY boot, so it also re-asserts over an admin who toggled AutoCron on in the
+ * UI — by design, and logged loudly so "why doesn't the UI setting stick?" is answered in
+ * the pod logs. Gated by OSTICKET_ENFORCE_EXTERNAL_CRON (default on); set it to 0 to opt
+ * out and accept responsibility for single-fetcher topology yourself.
+ */
+function seed_enforce_external_cron($prefix) {
+    $enforce = strtolower((string) env('OSTICKET_ENFORCE_EXTERNAL_CRON', '1'));
+    if (in_array($enforce, array('0', 'false', 'off', 'no'), true)) {
+        seed_log('NOTE: OSTICKET_ENFORCE_EXTERNAL_CRON is OFF — AutoCron left untouched. With more');
+        seed_log('NOTE: than one replica this risks concurrent mailbox fetch (duplicate tickets).');
+        return;
+    }
+    if (db_query("UPDATE `{$prefix}config` SET `value`='0' WHERE `namespace`='core' AND `key`='enable_auto_cron'", false)) {
+        seed_log('ENFORCED external-cron: enable_auto_cron=0 — web replicas will NOT fetch mail; the');
+        seed_log('ENFORCED external-cron: external CronJob is the sole scheduled worker. The admin-UI');
+        seed_log('ENFORCED external-cron: "Enable AutoCron" toggle is overridden on every boot BY');
+        seed_log('ENFORCED external-cron: DESIGN (opt out: OSTICKET_ENFORCE_EXTERNAL_CRON=0).');
+    }
 }

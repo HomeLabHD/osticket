@@ -13,6 +13,25 @@ Two groups of variables:
 
 ---
 
+## Secrets injection
+
+The secret-class variables — `DB_PASS`, `INSTALL_SECRET`, `ADMIN_PASS`, `SMTP_PASSWORD` —
+can be provided **without putting them in the environment**, and the right method differs
+by platform:
+
+- **Docker:** each of those accepts a **`<VAR>_FILE`** form pointing at a file (Docker
+  `secrets:` at `/run/secrets/*`, or a bind-mount). The entrypoint reads the file into the
+  variable at startup and the file value wins — e.g. `DB_PASS_FILE=/run/secrets/db_pass`. So
+  the secret never lands in the container env or the compose file. See
+  [docs/docker/docker-compose.yaml](docker/docker-compose.yaml). The `_FILE` set is an
+  explicit allowlist of the known secrets (not "any var"), to keep the surface tight.
+- **Kubernetes:** use `secretKeyRef` (a `Secret`, ideally fed by ExternalSecret/Vault) →
+  env. The secret never appears in the manifest. See [docs/k8s/](k8s/).
+
+Either way the secret stays out of plaintext env and out of source control.
+
+---
+
 ## Networking
 
 | Variable    | Required | Default | Description |
@@ -86,8 +105,16 @@ Used **only** on the first boot against an empty database (ignored once installe
 | Variable        | Required | Default            | Description |
 |-----------------|----------|--------------------|-------------|
 | `TZ`            | no       | `UTC`              | Container timezone (e.g. `America/Los_Angeles`). |
+| `OSTICKET_ENFORCE_EXTERNAL_CRON` | no | `1` | Pin osTicket's AutoCron **off** on every boot, so web replicas never fetch mail on page loads. Set `0` to opt out (you then own single-fetcher safety). |
 
 > osTicket cron runs as a **separate CronJob** (see [docs/k8s/cronjob.yaml](k8s/cronjob.yaml)) on its own schedule, **not** in the web container — running it in every replica would race on mailbox fetch.
+>
+> **Why the admin-UI "Enable AutoCron" toggle won't stick:** osTicket has no distributed
+> lock around mail fetch, so AutoCron + multiple replicas is an unsupported topology
+> (concurrent fetch → duplicate tickets). With `OSTICKET_ENFORCE_EXTERNAL_CRON=1` (default)
+> the entrypoint re-asserts `enable_auto_cron=0` on **every** boot and logs it loudly — so
+> the single external CronJob stays the only scheduled worker. Set the var to `0` only if
+> you run exactly one web replica and want web-triggered cron.
 
 ### Optional PHP tuning
 

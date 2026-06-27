@@ -16,6 +16,27 @@ if [ "$(id -u)" = "0" ]; then
     exec su-exec "${PUID}:${PGID}" "$0" "$@"
 fi
 
+# ── Docker / file-based secret injection (the *_FILE convention). ─────────────────────
+# Each KNOWN secret may be supplied as <VAR>_FILE pointing at a file (Docker secrets at
+# /run/secrets/*, or a bind-mount), so it never sits in the container env or a compose
+# file. (Kubernetes injects via secretKeyRef→env.) NO eval and NO dynamic var-name
+# building: the explicit call sites below ARE the entire, auditable file-read surface, and
+# a hostile env value can only ever name a *path* — never become a command. File value
+# wins; single-line (CR/LF stripped); runs before anything below reads a secret.
+_load_secret() {  # $1 = var name (a literal here), $2 = file path from <VAR>_FILE
+    # Regular file only — reject FIFOs / device nodes / dirs (also avoids a blocking read).
+    [ -n "$2" ] && [ -f "$2" ] && [ -r "$2" ] || return 0
+    _secret="$(tr -d '\r\n' < "$2")"
+    export "$1=$_secret"
+    echo "[entrypoint] loaded $1 from ${1}_FILE (file-based secret)"
+}
+_load_secret DB_PASS        "${DB_PASS_FILE:-}"
+_load_secret INSTALL_SECRET "${INSTALL_SECRET_FILE:-}"
+_load_secret ADMIN_PASS     "${ADMIN_PASS_FILE:-}"
+_load_secret SMTP_PASSWORD  "${SMTP_PASSWORD_FILE:-}"
+_load_secret SMTP_PASS      "${SMTP_PASS_FILE:-}"
+unset _secret
+
 # ── SMTP password: canonical SMTP_PASS, fall back to SMTP_PASSWORD (old deployments). ─
 SMTP_PASS="${SMTP_PASS:-${SMTP_PASSWORD:-}}"; export SMTP_PASS
 

@@ -1,0 +1,102 @@
+# osticket on Docker — the same web/cron split as the Kubernetes manifests.
+#
+#   osticket       → web tier (nginx + php-fpm). Stateless; scale it freely.
+#   osticket-cron  → ONE cron sidecar: the single serialized worker. The `while … sleep`
+#                    loop is the Docker analog of the k8s CronJob's concurrencyPolicy:Forbid.
+#   osticket-db    → MariaDB (the single source of truth).
+#
+# SECRETS are file-based (Docker `secrets:`), surfaced at /run/secrets/* and read via the
+# *_FILE env vars — they are NEVER placed in the container environment or this file.
+# (Kubernetes injects via secretKeyRef→env; this is the Docker-native equivalent.)
+#
+# Create the secret files before `docker compose up`:
+#   mkdir -p secrets
+#   printf '%s' 'YOUR_DB_PASSWORD'        > secrets/db_pass
+#   printf '%s' 'A_32+_CHAR_STABLE_VALUE' > secrets/install_secret   # MUST be stable across replicas
+#   printf '%s' 'YOUR_ADMIN_PASSWORD'     > secrets/admin_pass
+#   printf '%s' 'YOUR_SMTP_PASSWORD'      > secrets/smtp_password
+#   chmod 0400 secrets/*
+# (Swarm: replace each `file:` with `external: true` and `docker secret create` them.)
+#
+# AutoCron is enforced OFF on the web tier (OSTICKET_ENFORCE_EXTERNAL_CRON=1) so replicas
+# never fetch mail — only the cron sidecar does. SINGLE-NODE shortcut: drop osticket-cron
+# and set OSTICKET_ENFORCE_EXTERNAL_CRON=0 on the web service (web AutoCron is safe at 1 replica).
+
+secrets:
+  db_pass:        { file: ./secrets/db_pass }
+  install_secret: { file: ./secrets/install_secret }
+  admin_pass:     { file: ./secrets/admin_pass }
+  smtp_password:  { file: ./secrets/smtp_password }
+
+x-osticket-env: &osticket-env
+  DB_HOST: osticket-db
+  DB_NAME: osticket
+  DB_USER: osticket
+  DB_PASS_FILE: /run/secrets/db_pass
+  INSTALL_NAME: "My Helpdesk"
+  INSTALL_EMAIL: helpdesk@example.com
+  INSTALL_SECRET_FILE: /run/secrets/install_secret
+  ADMIN_USER: ostadmin
+  ADMIN_EMAIL: admin@example.com
+  ADMIN_PASS_FILE: /run/secrets/admin_pass
+  ADMIN_FIRSTNAME: Admin
+  ADMIN_LASTNAME: User
+  # SMTP (optional): host/user are not secret; the password is file-based.
+  # SMTP_HOST: smtp.example.com
+  # SMTP_USER: helpdesk@example.com
+  SMTP_PASSWORD_FILE: /run/secrets/smtp_password
+  TZ: UTC
+
+x-osticket-secrets: &osticket-secrets
+  - db_pass
+  - install_secret
+  - admin_pass
+  - smtp_password
+
+services:
+  osticket:
+    image: ghcr.io/homelabhd/osticket:latest-dev   # pin a real tag in production
+    restart: unless-stopped
+    environment:
+      <<: *osticket-env
+      OSTICKET_ENFORCE_EXTERNAL_CRON: "1"           # web replicas must not fetch mail
+    secrets: *osticket-secrets
+    ports:
+      - "8080:8080"                                 # front with a reverse proxy for TLS
+    depends_on:
+      osticket-db:
+        condition: service_healthy
+    # scale the web tier:  docker compose up -d --scale osticket=3
+
+  osticket-cron:
+    image: ghcr.io/homelabhd/osticket:latest-dev
+    restart: unless-stopped
+    # The default entrypoint resolves *_FILE secrets and writes ost-config.php (idempotent)
+    # BEFORE this serial loop runs cron — same bootstrap as the web tier. Keep it ONE replica.
+    command: ["sh", "-c", "while true; do php /var/www/html/api/cron.php; sleep 300; done"]
+    environment: *osticket-env
+    secrets: *osticket-secrets
+    depends_on:
+      osticket-db:
+        condition: service_healthy
+
+  osticket-db:
+    image: mariadb:11
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: osticket
+      MARIADB_USER: osticket
+      MARIADB_PASSWORD_FILE: /run/secrets/db_pass   # MariaDB supports *_FILE too
+      MARIADB_RANDOM_ROOT_PASSWORD: "1"
+    secrets:
+      - db_pass
+    volumes:
+      - osticket-db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  osticket-db:

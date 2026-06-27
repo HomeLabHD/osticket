@@ -121,6 +121,7 @@ ENV PHP_INI_SCAN_DIR=/usr/local/etc/php/conf.d:/run/osticket/php \
     ADMIN_LASTNAME=User \
     PHP_MEMORY_LIMIT=256M \
     PHP_UPLOAD_MAX_SIZE=25M \
+    OSTICKET_ENFORCE_EXTERNAL_CRON=1 \
     TZ=UTC
 
 USER ${PUID}:${PGID}
