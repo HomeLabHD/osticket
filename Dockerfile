@@ -40,6 +40,10 @@ RUN set -eux; \
     mkdir -p /usr/src/ost; unzip -q /tmp/ost.zip -d /usr/src/ost; \
     SRC=/usr/src/ost/upload; [ -d "$SRC" ] || SRC=/usr/src/ost; \
     mkdir -p /var/www/html; cp -a "$SRC"/. /var/www/html/; \
+    # Security: the web installer dir must not be web-reachable. Rename it out of the
+    # 'setup/' name (which osTicket/nginx treat as the live wizard path) to setup_hidden;
+    # install-seed.php loads the Installer class from here at boot, nginx denies it (below).
+    mv /var/www/html/setup /var/www/html/setup_hidden; \
     rm -rf /usr/src/ost /tmp/ost.zip
 
 # ── Plugins: official set (hydrated → bundles deps, incl LDAP/OAuth/storage) + community ──
@@ -96,6 +100,9 @@ COPY rootfs/php-fpm-osticket.conf /usr/local/etc/php-fpm.d/zz-osticket.conf
 COPY rootfs/opcache.ini           /usr/local/etc/php/conf.d/opcache.ini
 COPY rootfs/docker-entrypoint.sh  /usr/local/bin/docker-entrypoint.sh
 COPY rootfs/web-run.sh            /usr/local/bin/web-run.sh
+# Headless env-driven installer — lives OUTSIDE the webroot (/var/www/html), so it is
+# never web-served. Run once on first boot by the entrypoint; drives osTicket's Installer.
+COPY rootfs/install-seed.php      /var/www/install-seed.php
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/web-run.sh
 
 # Runtime defaults — all overridable at deploy time. See docs/Environment_Variables.md.

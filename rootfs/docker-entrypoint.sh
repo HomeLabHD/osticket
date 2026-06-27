@@ -43,24 +43,17 @@ i=0; until db -e "SELECT 1" "${DB_NAME}" >/dev/null 2>&1; do
 done
 
 # ── First-run install (idempotent across replicas). ─────────────────────────────────
-# NOTE: the schema load + initial data + admin creation below mirror osTicket 1.18's
-# installer; this is the one part that must be verified against a live DB on first
-# deploy (config format + password hashing). If install is skipped/incomplete, osTicket
-# serves its setup wizard, so the container is always usable.
+# install-seed.php drives osTicket's OWN Installer class headlessly: it writes
+# ost-config.php from the 1.18 sample, loads the schema, creates the admin (with
+# osTicket's password hashing) and the default config/emails — so the system comes up
+# INSTALLED, never on the setup wizard. It is idempotent (skips if already installed)
+# and is the single source of install truth (no separate SQL load here). The encryption
+# secret comes from INSTALL_SECRET so every replica shares one SECRET_SALT.
 if db -e "SELECT 1 FROM ${DB_PREFIX}config LIMIT 1" "${DB_NAME}" >/dev/null 2>&1; then
     echo "[entrypoint] osTicket already installed — skipping install."
 else
     echo "[entrypoint] installing osTicket into ${DB_NAME} ..."
-    # 1) config file from env
-    SECRET="${INSTALL_SECRET:-$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')}"
-    sed -e "s/%TABLE_PREFIX%/${DB_PREFIX}/g" "${OST_ROOT}/include/ost-sampleconfig.php" \
-        > "${OST_ROOT}/include/ost-config.php"
-    # 2) schema
-    sed "s/%TABLE_PREFIX%/${DB_PREFIX}/g" "${OST_ROOT}/setup/inc/streams/core/install-mysql.sql" \
-        | db "${DB_NAME}"
-    # 3) admin + core config via osTicket's own classes (correct password hashing)
-    HTTP_PORT="${HTTP_PORT}" SECRET="${SECRET}" php "${OST_ROOT}/../install-seed.php" || {
-        echo "[entrypoint] WARN: seed step needs validation; osTicket will show the setup wizard."; }
+    php /var/www/install-seed.php
     echo "[entrypoint] install complete."
 fi
 
