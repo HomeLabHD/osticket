@@ -57,7 +57,7 @@ RUN set -eux; \
         "clonemeagain/attachment_preview:attachment-preview" \
         "clonemeagain/plugin-autocloser:auto-closer" \
         "bkonetzny/osticket-fetch-note:fetch-note" \
-        "Micke1101/OSTicket-plugin-field-radiobuttons:field-radiobuttons" \
+        "clonemeagain/OSTicket-plugin-field-radiobuttons:field-radiobuttons" \
         "clonemeagain/osticket-plugin-mentioner:mentioner" \
         "philbertphotos/osticket-multildap-auth:multi-ldap" \
         "clonemeagain/osticket-plugin-preventautoscroll:prevent-autoscroll" \
@@ -66,7 +66,8 @@ RUN set -eux; \
         "ipavlovi/osTicket-Microsoft-Teams-plugin:teams"; \
     do \
         repo="${spec%%:*}"; dst="${spec##*:}"; \
-        git clone --depth 1 "https://github.com/${repo}" "$PLUGINS/${dst}"; \
+        git clone --depth 1 "https://github.com/${repo}" "$PLUGINS/${dst}" \
+            || { echo "WARN: community plugin ${repo} unavailable — skipped"; continue; }; \
         rm -rf "$PLUGINS/${dst}/.git"; \
     done; \
     apk del .plugins
