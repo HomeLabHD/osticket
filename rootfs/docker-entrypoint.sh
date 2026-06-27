@@ -1,7 +1,7 @@
 #!/bin/sh
 # osTicket rootless entrypoint: render runtime config from env, do a one-time idempotent
-# install, then hand off to supervisord (nginx + php-fpm + cron). Runs unprivileged by
-# default (uid 1000); honors PUID/PGID only if explicitly started as root.
+# install, then hand off to the web supervisor (nginx + php-fpm); cron runs as a separate
+# CronJob. Runs unprivileged by default (uid 1000); honors PUID/PGID only if started as root.
 set -eu
 
 OST_ROOT=/var/www/html

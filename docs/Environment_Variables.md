@@ -86,7 +86,8 @@ Used **only** on the first boot against an empty database (ignored once installe
 | Variable        | Required | Default            | Description |
 |-----------------|----------|--------------------|-------------|
 | `TZ`            | no       | `UTC`              | Container timezone (e.g. `America/Los_Angeles`). |
-| `CRON_INTERVAL` | no       | `5`                | Minutes between osTicket cron runs (`api/cron.php`). |
+
+> osTicket cron runs as a **separate CronJob** (see [docs/k8s/cronjob.yaml](k8s/cronjob.yaml)) on its own schedule, **not** in the web container — running it in every replica would race on mailbox fetch.
 
 ### Optional PHP tuning
 
@@ -108,7 +109,6 @@ env:
   - { name: DB_USER,       value: osticket }
   - { name: DB_PASS,       valueFrom: { secretKeyRef: { name: osticket-secrets, key: DB_PASS } } }
   - { name: INSTALL_NAME,  value: "PrecisionPlanIT Helpdesk" }
-  - { name: CRON_INTERVAL, value: "5" }
   # …INSTALL_SECRET, ADMIN_*, SMTP_* from the secret…
 securityContext:
   runAsNonRoot: true

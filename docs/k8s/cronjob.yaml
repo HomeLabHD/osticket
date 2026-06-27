@@ -1,0 +1,67 @@
+# osTicket cron — the SINGLE source of cron in this deployment.
+#
+# osTicket's api/cron.php fetches mailboxes, runs scheduled tasks, and processes
+# the queue. It must run from EXACTLY ONE place: if every web replica ran it (the
+# old all-in-one image did), N replicas would race on mailbox fetch and duplicate
+# work. So cron lives here, as a CronJob — do NOT also run cron in the web pods.
+#
+# Uses the SAME image and the SAME DB env/secrets as the web Deployment; it just
+# invokes cron.php directly instead of the web entrypoint.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: osticket-cron
+  labels:
+    app.kubernetes.io/name: osticket
+    app.kubernetes.io/component: cron
+spec:
+  schedule: "*/5 * * * *"          # every 5 minutes
+  concurrencyPolicy: Forbid        # cron runs must never overlap
+  startingDeadlineSeconds: 120     # if the controller missed the slot, skip rather than pile up
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 240    # a cron tick should never run for >4 min; kill it if it does
+      backoffLimit: 0
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: osticket
+            app.kubernetes.io/component: cron
+        spec:
+          restartPolicy: OnFailure
+          # Same rootless posture as the web pods.
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: osticket-cron
+              # Pin the SAME tag you run for the web tier.
+              image: ghcr.io/homelabhd/osticket:latest
+              imagePullPolicy: IfNotPresent
+              # Run osTicket's cron entry point directly — bypasses the web launcher.
+              command: ["php", "/var/www/html/api/cron.php"]
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: [ALL]
+              env:
+                - { name: TZ, value: "UTC" }
+                # Same DB connection as the web tier (DB_PASS is a secret).
+                - { name: DB_HOST, value: "osticket-mariadb-primary" }
+                - { name: DB_PORT, value: "3306" }
+                - { name: DB_NAME, value: "osticket" }
+                - { name: DB_USER, value: "osticket" }
+                - name: DB_PASS
+                  valueFrom:
+                    secretKeyRef: { name: osticket-secrets, key: DB_PASS }
+                - { name: DB_PREFIX, value: "ost_" }
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+                limits:
+                  memory: 256Mi

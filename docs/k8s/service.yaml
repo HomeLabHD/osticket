@@ -1,0 +1,20 @@
+# Fronts the osTicket web Deployment on port 80, mapping to the rootless
+# container's 8080 listener. Keep the rootless posture: terminate 80/443 here
+# (or at an Ingress) — never make the container bind a privileged port itself.
+apiVersion: v1
+kind: Service
+metadata:
+  name: osticket-web
+  labels:
+    app.kubernetes.io/name: osticket
+    app.kubernetes.io/component: web
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: osticket
+    app.kubernetes.io/component: web
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+      protocol: TCP

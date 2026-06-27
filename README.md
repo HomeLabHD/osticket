@@ -1,6 +1,6 @@
 # 🎫 osticket
 
-A **rootless** container image for [osTicket](https://osticket.com/) — the open-source support-ticketing system — on a current, stock PHP runtime (**osTicket v1.18.x**, **PHP 8.3**). Runs **unprivileged** (uid 1000, arbitrary-UID capable), all-in-one (nginx + php-fpm + cron), with the official **and** community plugin set bundled.
+A **rootless** container image for [osTicket](https://osticket.com/) — the open-source support-ticketing system — on a current, stock PHP runtime (**osTicket v1.18.x**, **PHP 8.3**). Runs **unprivileged** (uid 1000, arbitrary-UID capable): nginx + php-fpm under a minimal rootless init (tini); osTicket cron runs as a separate CronJob. Ships with the official **and** community plugin set bundled.
 
 <!-- sf:project:start -->
 <!-- sf:project:end -->
@@ -14,7 +14,7 @@ A **rootless** container image for [osTicket](https://osticket.com/) — the ope
 |                        |                                                                                 |
 | ---------------------- | ------------------------------------------------------------------------------- |
 | **Rootless**           | Runs as uid 1000 — and as *any* uid (OpenShift/hardened-cluster arbitrary-UID)   |
-| **All-in-one**         | nginx + php-fpm + osTicket cron, supervised by supervisord, one container        |
+| **Minimal init**       | nginx + php-fpm under a minimal rootless init (tini); osTicket cron runs as a separate CronJob |
 | **Current**            | osTicket `1.18.x` on stock `php:8.3-fpm-alpine` — no resurrected vendor base      |
 | **Plugins bundled**    | Official set (LDAP, OAuth, storage) + community (Slack, Teams, Archiver, …)       |
 | **Env-driven install** | Idempotent first-boot install from env → multiple stateless replicas             |

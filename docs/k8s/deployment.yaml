@@ -1,0 +1,102 @@
+# osTicket WEB tier — nginx + php-fpm under tini, rootless.
+#
+# This Deployment runs ONLY the web container. osTicket cron runs as a separate
+# CronJob (cronjob.yaml) — do NOT run cron in these pods, or every replica would
+# race on mailbox fetch. The web image no longer ships an in-container cron.
+#
+# All replicas are stateless (state lives in MariaDB); the entrypoint does an
+# idempotent first-boot install, so scaling out is safe.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: osticket-web
+  labels:
+    app.kubernetes.io/name: osticket
+    app.kubernetes.io/component: web
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: osticket
+      app.kubernetes.io/component: web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: osticket
+        app.kubernetes.io/component: web
+    spec:
+      # Rootless posture for the whole pod. The image already runs as uid 1000 and
+      # is arbitrary-UID capable (writable dirs are group-0 + group-writable).
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: osticket
+          # Pin a real tag in production (e.g. :1.18.4) — :latest is shown for clarity.
+          image: ghcr.io/homelabhd/osticket:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          env:
+            # ── Networking ──
+            - { name: HTTP_PORT, value: "8080" }
+            - { name: TZ, value: "UTC" }
+            # ── Database (DB_PASS is a secret) ──
+            - { name: DB_HOST, value: "osticket-mariadb-primary" }
+            - { name: DB_PORT, value: "3306" }
+            - { name: DB_NAME, value: "osticket" }
+            - { name: DB_USER, value: "osticket" }
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef: { name: osticket-secrets, key: DB_PASS }
+            - { name: DB_PREFIX, value: "ost_" }
+            # ── First-run install (only used against an empty DB; INSTALL_SECRET is a secret) ──
+            - { name: INSTALL_NAME, value: "PrecisionPlanIT Helpdesk" }
+            - { name: INSTALL_EMAIL, value: "helpdesk@example.com" }
+            - name: INSTALL_SECRET
+              valueFrom:
+                secretKeyRef: { name: osticket-secrets, key: INSTALL_SECRET }
+            # ── Initial admin account (ADMIN_PASS is a secret) ──
+            - { name: ADMIN_USER, value: "admin" }
+            - name: ADMIN_PASS
+              valueFrom:
+                secretKeyRef: { name: osticket-secrets, key: ADMIN_PASS }
+            - { name: ADMIN_EMAIL, value: "admin@example.com" }
+            - { name: ADMIN_FIRSTNAME, value: "Admin" }
+            - { name: ADMIN_LASTNAME, value: "User" }
+            # ── SMTP (outbound mail; SMTP_PASSWORD is a secret) ──
+            - { name: SMTP_HOST, value: "smtp.example.com" }
+            - { name: SMTP_PORT, value: "587" }
+            - { name: SMTP_USER, value: "helpdesk@example.com" }
+            - name: SMTP_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: osticket-secrets, key: SMTP_PASSWORD }
+            - { name: SMTP_FROM, value: "helpdesk@example.com" }
+            - { name: SMTP_TLS, value: "1" }
+          readinessProbe:
+            httpGet:
+              path: /scp/login.php
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /scp/login.php
+              port: 8080
+            initialDelaySeconds: 45
+            periodSeconds: 15
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 512Mi

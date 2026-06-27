@@ -1,6 +1,7 @@
-# osTicket — rootless, self-owned image on a stock, current PHP base. All-in-one
-# (nginx + php-fpm + cron), but UNPRIVILEGED: runs as uid 1000 (arbitrary-UID capable),
-# nginx binds 8080 (not 80), nothing needs root at runtime.
+# osTicket — rootless, self-owned image on a stock, current PHP base. Web tier
+# (nginx + php-fpm) under tini, but UNPRIVILEGED: runs as uid 1000 (arbitrary-UID capable),
+# nginx binds 8080 (not 80), nothing needs root at runtime. osTicket cron runs as a
+# separate Kubernetes CronJob (see docs/k8s/cronjob.yaml), NOT in the web container.
 #
 # PHP pinned to 8.3 ON PURPOSE: osTicket needs the imap extension, which was removed from
 # PHP core in 8.4 (8.4+ breaks `docker-php-ext-install imap`). The moving 8.3 tag
@@ -16,12 +17,13 @@ LABEL org.opencontainers.image.title="osticket" \
       org.opencontainers.image.description="osTicket support ticketing — rootless, php-fpm+nginx, self-built" \
       org.opencontainers.image.source="https://github.com/HomeLabHD/osticket"
 
-# ── PHP extensions + nginx + supervisor ─────────────────────────────────────────
+# ── PHP extensions + nginx + tini ───────────────────────────────────────────────
 # Runtime libs and tools are kept; the compiler toolchain (.build-deps) is installed
 # and removed in the same layer, so the image carries the .so's, not the build chain.
+# tini is a tiny init/reaper (PID1): reaps zombies + forwards signals, fully rootless.
 RUN set -eux; \
     apk add --no-cache \
-        nginx supervisor mariadb-client tzdata curl su-exec \
+        nginx tini mariadb-client tzdata curl su-exec \
         c-client freetype gettext icu-libs krb5-libs libintl libjpeg-turbo libldap libpng libzip oniguruma; \
     apk add --no-cache --virtual .build-deps \
         $PHPIZE_DEPS freetype-dev gettext-dev icu-dev imap-dev krb5-dev \
@@ -77,14 +79,14 @@ RUN set -eux; \
     adduser -u ${PUID} -G osticket -D -H -s /sbin/nologin osticket; \
     # Drop the stock php-fpm pool (it sets user=www-data, which a non-root master can't setuid to).
     rm -f /usr/local/etc/php-fpm.d/www.conf /usr/local/etc/php-fpm.d/www.conf.default; \
-    mkdir -p /run/osticket /var/lib/nginx/tmp /var/log/supervisor; \
+    mkdir -p /run/osticket /var/lib/nginx/tmp; \
     # Rootless + arbitrary-uid (OpenShift pattern): own writable paths by uid 1000 AND
     # group 0, group-writable — so the image runs as 1000 by default OR any runAsUser
     # (gid 0) with no root and no runtime chown. osTicket is stateless, so this covers all.
     # Scope is narrow ON PURPOSE: generated config + runtime state/temp/logs only — NOT
     # the PHP config tree (mutable config dirs are a bigger trust surface). PHP runtime
     # overrides are rendered into /run/osticket/php instead (see PHP_INI_SCAN_DIR).
-    for d in /var/www/html/include /run/osticket /var/lib/nginx /var/log/supervisor; do \
+    for d in /var/www/html/include /run/osticket /var/lib/nginx; do \
         chown -R ${PUID}:0 "$d"; chmod -R g+rwX "$d"; \
     done
 
@@ -92,9 +94,9 @@ RUN set -eux; \
 COPY rootfs/nginx.conf            /etc/nginx/nginx.conf
 COPY rootfs/php-fpm-osticket.conf /usr/local/etc/php-fpm.d/zz-osticket.conf
 COPY rootfs/opcache.ini           /usr/local/etc/php/conf.d/opcache.ini
-COPY rootfs/supervisord.conf      /etc/supervisor/supervisord.conf
 COPY rootfs/docker-entrypoint.sh  /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+COPY rootfs/web-run.sh            /usr/local/bin/web-run.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/web-run.sh
 
 # Runtime defaults — all overridable at deploy time. See docs/Environment_Variables.md.
 # HTTP_PORT defaults to 8080 because the container is rootless (uid 1000) and an
@@ -106,7 +108,6 @@ ENV PHP_INI_SCAN_DIR=/usr/local/etc/php/conf.d:/run/osticket/php \
     DB_PORT=3306 \
     DB_NAME=osticket \
     DB_PREFIX=ost_ \
-    CRON_INTERVAL=5 \
     SMTP_PORT=587 \
     SMTP_TLS=1 \
     ADMIN_FIRSTNAME=Admin \
@@ -120,5 +121,5 @@ WORKDIR /var/www/html
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=45s \
     CMD curl -fsS -o /dev/null "http://127.0.0.1:${HTTP_PORT}/scp/login.php" || exit 1
-ENTRYPOINT ["docker-entrypoint.sh"]
-CMD ["supervisord", "-c", "/etc/supervisor/supervisord.conf"]
+ENTRYPOINT ["tini", "--", "docker-entrypoint.sh"]
+CMD ["web-run.sh"]
