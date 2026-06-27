@@ -14,8 +14,7 @@ ARG PGID=1000
 
 LABEL org.opencontainers.image.title="osticket" \
       org.opencontainers.image.description="osTicket support ticketing — rootless, php-fpm+nginx, self-built" \
-      org.opencontainers.image.source="https://gitlab.prplanit.com/HomeLabHD/osticket" \
-      org.opencontainers.image.base.name="docker.io/library/php:8.3-fpm-alpine"
+      org.opencontainers.image.source="https://github.com/HomeLabHD/osticket"
 
 # ── PHP extensions + nginx + supervisor ─────────────────────────────────────────
 # Runtime libs and tools are kept; the compiler toolchain (.build-deps) is installed
