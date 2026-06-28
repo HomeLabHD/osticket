@@ -83,7 +83,7 @@ RUN set -eux; \
     adduser -u ${PUID} -G osticket -D -H -s /sbin/nologin osticket; \
     # Drop the stock php-fpm pool (it sets user=www-data, which a non-root master can't setuid to).
     rm -f /usr/local/etc/php-fpm.d/www.conf /usr/local/etc/php-fpm.d/www.conf.default; \
-    mkdir -p /run/osticket /var/lib/nginx/tmp; \
+    mkdir -p /run/osticket /var/lib/nginx/tmp /var/lib/nginx/logs; \
     # Rootless + arbitrary-uid (OpenShift pattern): own writable paths by uid 1000 AND
     # group 0, group-writable — so the image runs as 1000 by default OR any runAsUser
     # (gid 0) with no root and no runtime chown. osTicket is stateless, so this covers all.
