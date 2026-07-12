@@ -36,7 +36,7 @@ workflow:
   DOCKER_CERT_PATH: "/certs/client"
 
 default:
-  image: docker.io/prplanit/stagefreight:latest-dev
+  image: docker.cr.pcfae.com/prplanit/stagefreight:latest-dev
   interruptible: true
 
 audition:
