@@ -86,10 +86,10 @@ publish:
     tags: ["v{version}", "latest"]
     when: { git_tags: [stable], events: [tag] }
 
-  # ── Pre-releases → Docker Hub + GHCR ──
+  # ── Pre-releases → all registries ──
   prerelease:
     kind: registry
-    registry: [dockerhub, ghcr]
+    registry: [dockerhub, ghcr, harbor]
     build: osticket
     tags: ["v{version}"]
     when: { git_tags: [prerelease], events: [tag] }
