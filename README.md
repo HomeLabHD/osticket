@@ -1,6 +1,6 @@
 # 🎫 osticket
 
-A **rootless** container image for [osTicket](https://osticket.com/) — the open-source support-ticketing system — on a current, stock PHP runtime (**osTicket v1.18.x**, **PHP 8.3**). Runs **unprivileged** (uid 1000, arbitrary-UID capable): nginx + php-fpm under a minimal rootless init (tini); osTicket cron runs as a separate CronJob. Ships with the official **and** community plugin set bundled.
+A **rootless** container image for [osTicket](https://osticket.com/) — the open-source support-ticketing system. Runs **unprivileged** (uid 1000, arbitrary-UID capable): nginx + php-fpm under a minimal rootless init (tini); osTicket cron runs as a separate CronJob. Ships with the official **and** community plugin set bundled.
 
 <!-- sf:project:start -->
 [![badge/GitHub-source-181717?logo=github](https://img.shields.io/badge/GitHub-source-181717?logo=github)](https://github.com/HomeLabHD/osticket) [![badge/GitLab-source-FC6D26?logo=gitlab](https://img.shields.io/badge/GitLab-source-FC6D26?logo=gitlab)](https://gitlab.prplanit.com/HomeLabHD/osticket) [![badge/upstream-osTicket-0099CC?logo=osticket](https://img.shields.io/badge/upstream-osTicket-0099CC?logo=osticket)](https://github.com/osTicket/osTicket) [![Last Commit](https://img.shields.io/github/last-commit/HomeLabHD/osticket)](https://github.com/HomeLabHD/osticket/commits) [![Open Issues](https://img.shields.io/github/issues/HomeLabHD/osticket)](https://github.com/HomeLabHD/osticket/issues) [![Contributors](https://img.shields.io/github/contributors/HomeLabHD/osticket)](https://github.com/HomeLabHD/osticket/graphs/contributors)
@@ -11,6 +11,16 @@ A **rootless** container image for [osTicket](https://osticket.com/) — the ope
 <!-- sf:image:start -->
 [![badge/ghcr.io-homelabhd%2Fosticket-181717?logo=github](https://img.shields.io/badge/ghcr.io-homelabhd%2Fosticket-181717?logo=github)](https://github.com/HomeLabHD/osticket/pkgs/container/osticket) [![badge/Docker-hlhd%2Fosticket-2496ED?logo=docker&logoColor=white](https://img.shields.io/badge/Docker-hlhd%2Fosticket-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/hlhd/osticket) [![pulls](https://raw.githubusercontent.com/HomeLabHD/osticket/main/.stagefreight/badges/pulls.svg)](https://hub.docker.com/r/hlhd/osticket)
 <!-- sf:image:end -->
+
+## Image contents
+
+Base:
+<!-- sf:contents-base:start -->
+<!-- sf:contents-base:end -->
+
+Packages:
+<!-- sf:contents-apk:start -->
+<!-- sf:contents-apk:end -->
 
 ### Features
 

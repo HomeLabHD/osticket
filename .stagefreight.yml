@@ -3,9 +3,16 @@ version: 1
 ci:
   image: docker.cr.pcfae.com/prplanit/stagefreight:latest-dev
 
-matchers:
+git:
   branches:
     main: "^main$"
+  tags:
+    stable:     { pattern: "^v?\\d+\\.\\d+\\.\\d+$" }
+    prerelease: { pattern: "^v?\\d+\\.\\d+\\.\\d+-.+" }
+  versioning:
+    branch_builds:
+      default: { base_from: [stable], format: "{base}-dev+{sha}" }
+    no_lineage: { mode: error }
 
 vars:
   org: hlhd
@@ -14,42 +21,26 @@ vars:
   repo: osticket
   github_repo: osticket
 
-versioning:
-  tag_sources:
-    - id: stable
-      pattern: "^v?\\d+\\.\\d+\\.\\d+$"
-    - id: prerelease
-      pattern: "^v?\\d+\\.\\d+\\.\\d+-.+"
-  branch_builds:
-    - id: default
-      base_from: [stable]
-      format: "{base}-dev+{sha}"
-  no_lineage:
-    # Bootstrap: no stable tag yet, so dev builds use an explicit honest version
-    # (0.0.0 base + commit sha). Switch to `mode: error` once the first v-release exists.
-    mode: explicit
-    version: "0.0.0-dev+{sha}"
-
 builds:
-  # osTicket builds entirely in the Dockerfile (app + plugins fetched at build) — there is
-  # no first-party binary to recycle, so a single docker build (no binary engine).
-  - id: osticket
+  # hlhd/osticket — rootless osTicket image (FROM php:fpm-alpine); nginx + php-fpm
+  # under tini. No first-party binary to recycle, so a single docker build.
+  osticket:
     kind: docker
     platforms: [linux/amd64]
 
 forges:
-  - id: gitlab
+  gitlab:
     provider: gitlab
     url: "https://gitlab.prplanit.com"
     credentials: GITLAB
 
-  - id: github
+  github:
     provider: github
     url: "https://github.com"
     credentials: GITHUB
 
 repos:
-  - id: primary
+  primary:
     forge: gitlab
     project: "{var:gitlab_group}/{var:repo}"
     roles: [primary]
@@ -57,7 +48,7 @@ repos:
       default: main
     worktree: "."
 
-  - id: github-mirror
+  github-mirror:
     forge: github
     project: "{var:github_org}/{var:github_repo}"
     roles: [mirror, publish-origin]
@@ -66,120 +57,87 @@ repos:
       releases: true
 
 registries:
-  - id: dockerhub
+  dockerhub:
     provider: docker
     url: docker.io
     credentials: DOCKER
     default_path: "{var:org}/{var:repo}"
 
-  - id: harbor
+  harbor:
     provider: harbor
     url: cr.pcfae.com
     credentials: HARBOR
     default_path: "{var:org}/{var:repo}"
 
-  # GitHub Container Registry (primary). On GitHub Actions, StageFreight auto-wires
-  # GHCR_USER/GHCR_TOKEN from the runner's GITHUB_TOKEN (packages: write) — no secret.
-  - id: ghcr
+  # GitHub Container Registry. On GitHub Actions, StageFreight auto-wires GHCR_USER/
+  # GHCR_TOKEN from the runner's GITHUB_TOKEN (packages: write) — no configured secret.
+  ghcr:
     provider: ghcr
     url: ghcr.io
     credentials: GHCR
     default_path: "homelabhd/{var:repo}"   # ghcr namespace = github owner, lowercased
 
-targets:
-  # ── GHCR (primary): dev builds on every commit (turnkey on GitHub Actions) ──
-  - id: ghcr-dev
+publish:
+  # ── Stable releases → all registries ──
+  stable:
     kind: registry
-    registry: ghcr
+    registry: [dockerhub, ghcr, harbor]
+    build: osticket
+    tags: ["v{version}", "latest"]
+    when: { git_tags: [stable], events: [tag] }
+
+  # ── Pre-releases → Docker Hub + GHCR ──
+  prerelease:
+    kind: registry
+    registry: [dockerhub, ghcr]
+    build: osticket
+    tags: ["v{version}"]
+    when: { git_tags: [prerelease], events: [tag] }
+
+  # ── Dev builds on every commit → all registries (retained/pruned) ──
+  dev:
+    kind: registry
+    registry: [dockerhub, ghcr, harbor]
     build: osticket
     tags: ["dev-{sha:8}", "latest-dev"]
     when: { branches: [main], events: [push] }
-
-  - id: ghcr-stable
-    kind: registry
-    registry: ghcr
-    build: osticket
-    tags: ["v{version}", "latest"]
-    when: { git_tags: [stable], events: [tag] }
-
-  - id: ghcr-prerelease
-    kind: registry
-    registry: ghcr
-    build: osticket
-    tags: ["v{version}"]
-    when: { git_tags: [prerelease], events: [tag] }
-
-  # ── Docker Hub ──
-  - id: dockerhub-stable
-    kind: registry
-    registry: dockerhub
-    build: osticket
-    tags: ["v{version}", "latest"]
-    when: { git_tags: [stable], events: [tag] }
-
-  - id: dockerhub-prerelease
-    kind: registry
-    registry: dockerhub
-    build: osticket
-    tags: ["v{version}"]
-    when: { git_tags: [prerelease], events: [tag] }
-
-  - id: dockerhub-dev
-    kind: registry
-    registry: dockerhub
-    build: osticket
-    tags: ["dev-{sha:8}", "latest-dev"]
-    # No Docker Hub push creds on the GitHub fork → gitlab-only.
-    when: { branches: [main], events: [push], forges: [gitlab] }
     retention:
       keep_last: 6
       protect: ["latest-dev"]
 
-  # ── Harbor (private cr.pcfae.com; unreachable from hosted GitHub runners → gitlab-only) ──
-  - id: harbor-dev
-    kind: registry
-    registry: harbor
-    build: osticket
-    tags: ["dev-{sha:8}", "latest-dev"]
-    when: { branches: [main], events: [push], forges: [gitlab] }
-
-  - id: harbor-stable
-    kind: registry
-    registry: harbor
-    build: osticket
-    tags: ["v{version}", "latest"]
-    when: { git_tags: [stable], events: [tag], forges: [gitlab] }
-
-  # ── Docker Hub README sync ──
-  - id: dockerhub-readme
-    kind: docker-readme
-    registry: dockerhub
+  # ── Project metadata: registry overviews + forge repos ──
+  project-metadata:
+    kind: metadata
+    registry: [dockerhub, harbor]
+    repos: [primary, github-mirror]
+    readme: README.md
+    description:
+      - "A rootless (unprivileged, arbitrary-UID) container image for osTicket — the open-source support-ticketing system — nginx + php-fpm under tini, with the official and community plugin set bundled."
+    topics: [osticket, ticketing, support, php, rootless, docker]
     when: { branches: [main], events: [push, tag] }
-    file: "README.md"
-    description: "osTicket support ticketing — rootless, current (1.18.x), self-built"
 
-  # ── Releases ──
-  - id: primary-release
+  # ── Release (gitlab primary; projects to github via github-mirror sync.releases) ──
+  release:
     kind: release
+    type: latest
+    repos: [primary]
     aliases: ["v{version}", "latest"]
-    when: { git_tags: [stable], events: [tag] }
-
-  - id: github-release
-    kind: release
-    mirror: github-mirror
-    sync_release: true
     when: { git_tags: [stable], events: [tag] }
 
 build_cache:
   mode: hybrid
   external:
-    target: harbor-dev
+    registry: harbor
     path: "cache"
     fallback: "main"
   local:
     retention:
       max_age: "7d"
       max_size: "8GB"
+
+manifest:
+  enabled: true
+  mode: workspace
 
 commit:
   default_type: docs
@@ -190,7 +148,7 @@ dependency:
   enabled: true
   output: ".stagefreight/deps"
   scope:
-    dockerfile_env: true   # tracks the FROM image + OSTICKET_VERSION/plugin args
+    dockerfile_env: true
   commit:
     enabled: true
     type: chore
@@ -202,27 +160,16 @@ lint:
   level: full
   exclude:
     - "*.png"
-    - "*.jpg"
+    - "*.svg"
     - "*.ico"
-    - "*.woff"
-    - "*.woff2"
   modules:
     freshness:
       enabled: true
-      options:
-        cache_ttl: 300
-        sources:
-          docker_images: true
-          github_releases: true
-        # Version lag is maintenance, not a vulnerability: a major behind warns, it does
-        # not fail CI. Known CVEs still escalate to critical via severity_override.
-        severity:
-          major: 1
-          minor: 1
-          patch: 0
-        vulnerability:
-          enabled: true
-          severity_override: true
+      cache_ttl: 300
+      sources:
+        docker_images: true
+      vulnerability:
+        enabled: true
     tabs:
       enabled: true
     secrets:
@@ -233,14 +180,13 @@ lint:
       enabled: true
     unicode:
       enabled: true
-      options:
-        detect_bidi: true
-        detect_zero_width: true
-        detect_control_ascii: true
+      detect_bidi: true
+      detect_zero_width: true
+      detect_control_ascii: true
 
 release:
   enabled: true
-  security_summary: ".stagefreight/security"
+  security_summary: true
   registry_links: true
 
 security:
@@ -250,160 +196,73 @@ security:
   release_detail: full
 
 toolchains:
-  desired:
-    trivy:
-      version: "0.69.3"
-    syft:
-      version: "1.42.3"
-    grype:
-      version: "0.110.0"
-    osv-scanner:
-      version: "2.3.5"
-    cosign:
-      version: "3.0.6"
+  trivy: "0.69.3"
+  syft: "1.42.3"
+  grype: "0.110.0"
+  osv-scanner: "2.3.5"
+  cosign: "3.0.6"
 
-narrate:
-  badges:
-    - id: build
-      text: build
-      value: "{env:BUILD_STATUS}"
-      color: auto
-      font: monofur
-      output: ".stagefreight/badges/build.svg"
-      link: "https://gitlab.prplanit.com/{var:gitlab_group}/{var:repo}/-/pipelines"
-    - id: license
-      text: license
-      value: "GPL-2.0"
-      color: "#310937"
-      font: monofur
-      output: ".stagefreight/badges/license.svg"
-      link: "https://github.com/osTicket/osTicket/blob/develop/LICENSE.txt"
-    - id: release
-      text: release
-      value: "v{base}"
-      color: "#74ecbe"
-      font: dejavu-sans
-      font_size: 11
-      output: ".stagefreight/badges/release.svg"
-      link: "https://github.com/{var:github_org}/{var:github_repo}/releases"
-    - id: updated
-      text: updated
-      value: "{env:BUILD_DATE}"
-      color: "#236144"
-      font: dejavu-sans
-      font_size: 11
-      output: ".stagefreight/badges/updated.svg"
-    - id: pulls
-      text: pulls
-      value: "{docker.pulls}"
-      color: "#1d63ed"
-      output: ".stagefreight/badges/pulls.svg"
-      link: "https://hub.docker.com/r/{var:org}/{var:repo}"
-    - id: release-latest
-      text: latest
-      value: "v{base}"
-      color: "#74ecbe"
-      output: ".stagefreight/badges/latest.svg"
-      link: "https://hub.docker.com/r/{var:org}/{var:repo}/tags?name=latest"
-    - id: dev-latest
-      text: latest-dev
-      value: "dev-{sha:8}"
-      color: "#3b82f6"
-      output: ".stagefreight/badges/latest-dev.svg"
-      link: "https://hub.docker.com/r/{var:org}/{var:repo}/tags?name=latest-dev"
-    - id: dev-updated
-      text: updated
-      value: "{docker.tag.latest-dev.updated}"
-      color: "#236144"
-      output: ".stagefreight/badges/dev-updated.svg"
-    - id: dev-size
-      text: size
-      value: "{docker.tag.latest-dev.size}"
-      color: "#555"
-      output: ".stagefreight/badges/dev-size.svg"
-      link: "https://hub.docker.com/r/{var:org}/{var:repo}/tags?name=latest-dev"
+# stencils: define each renderable once (id → stencil def). Inline defs render a
+# badge (default) or a shield (render: shield); named producers render via type.
+stencils:
+  # ── generated badges ──
+  build:   { label: build,   message: "{env:BUILD_STATUS}", color: auto, font: monofur, link: "https://gitlab.prplanit.com/{var:gitlab_group}/{var:repo}/-/pipelines" }
+  license: { label: license, message: "GPL-2.0", color: "#310937", font: monofur, link: LICENSE }
+  release: { label: release, message: "v{base}", color: "#74ecbe", font: dejavu-sans, font_size: 11, link: "https://github.com/{var:github_org}/{var:github_repo}/releases" }
+  updated: { label: updated, message: "{env:BUILD_DATE}", color: "#236144", font: dejavu-sans, font_size: 11 }
+  pulls:   { label: pulls,   message: "{docker.pulls}", color: "#1d63ed", link: "https://hub.docker.com/r/{var:org}/{var:repo}" }
 
-  patches:
-    - file: "README.md"
-      items:
-        - id: badge.build
-          kind: badge_ref
-          ref: build
-          placement: { between: ["<!-- sf:badges:start -->", "<!-- sf:badges:end -->"], mode: replace, inline: true }
-        - id: badge.license
-          kind: badge_ref
-          ref: license
-          placement: { between: ["<!-- sf:badges:start -->", "<!-- sf:badges:end -->"], mode: replace, inline: true }
-        - id: badge.release
-          kind: badge_ref
-          ref: release
-          placement: { between: ["<!-- sf:badges:start -->", "<!-- sf:badges:end -->"], mode: replace, inline: true }
-        - id: badge.updated
-          kind: badge_ref
-          ref: updated
-          placement: { between: ["<!-- sf:badges:start -->", "<!-- sf:badges:end -->"], mode: replace, inline: true }
-        - id: shield.donate
-          kind: shield
-          placement: { between: ["<!-- sf:badges:start -->", "<!-- sf:badges:end -->"], mode: replace, inline: true }
-          shield: "badge/donate-FF5E5B?logo=ko-fi&logoColor=white"
-          link: "https://ko-fi.com/T6T41IT163"
-        - id: shield.sponsor
-          kind: shield
-          placement: { between: ["<!-- sf:badges:start -->", "<!-- sf:badges:end -->"], mode: replace, inline: true }
-          shield: "badge/sponsor-EA4AAA?logo=githubsponsors&logoColor=white"
-          link: "https://github.com/sponsors/{var:github_org}"
+  # ── inline shields ──
+  donate:  { render: shield, message: donate,  color: "#FF5E5B", logo: ko-fi,          logo_color: white, link: "https://ko-fi.com/T6T41IT163" }
+  sponsor: { render: shield, message: sponsor, color: "#EA4AAA", logo: githubsponsors, logo_color: white, link: "https://github.com/sponsors/{var:github_org}" }
+  github:  { render: shield, label: GitHub, message: source, color: "#181717", logo: github, link: "https://github.com/{var:github_org}/{var:github_repo}" }
+  gitlab:  { render: shield, label: GitLab, message: source, color: "#FC6D26", logo: gitlab, link: "https://gitlab.prplanit.com/{var:gitlab_group}/{var:repo}" }
+  docker:  { render: shield, label: Docker, message: "{var:org}/{var:repo}", color: "#2496ED", logo: docker, logo_color: white, link: "https://hub.docker.com/r/{var:org}/{var:repo}" }
 
-        - id: project.github
-          kind: shield
-          placement: { between: ["<!-- sf:project:start -->", "<!-- sf:project:end -->"], mode: replace, inline: true }
-          shield: "badge/GitHub-source-181717?logo=github"
-          link: "https://github.com/{var:github_org}/{var:github_repo}"
-        - id: project.gitlab
-          kind: shield
-          placement: { between: ["<!-- sf:project:start -->", "<!-- sf:project:end -->"], mode: replace, inline: true }
-          shield: "badge/GitLab-source-FC6D26?logo=gitlab"
-          link: "https://gitlab.prplanit.com/{var:gitlab_group}/{var:repo}"
-        - id: project.upstream
-          kind: shield
-          placement: { between: ["<!-- sf:project:start -->", "<!-- sf:project:end -->"], mode: replace, inline: true }
-          shield: "badge/upstream-osTicket-0099CC?logo=osticket"
-          link: "https://github.com/osTicket/osTicket"
-        - id: project.last-commit
-          kind: props
-          type: github-last-commit
-          placement: { between: ["<!-- sf:project:start -->", "<!-- sf:project:end -->"], mode: replace, inline: true }
-          params: { repo: "{var:github_org}/{var:github_repo}" }
-        - id: project.issues-open
-          kind: props
-          type: github-issues-open
-          placement: { between: ["<!-- sf:project:start -->", "<!-- sf:project:end -->"], mode: replace, inline: true }
-          params: { repo: "{var:github_org}/{var:github_repo}" }
-        - id: project.contributors
-          kind: props
-          type: github-contributors
-          placement: { between: ["<!-- sf:project:start -->", "<!-- sf:project:end -->"], mode: replace, inline: true }
-          params: { repo: "{var:github_org}/{var:github_repo}" }
+  # ── named producers (repo resolves from repos: publish-origin) ──
+  last-commit:  { type: github-last-commit }
+  issues-open:  { type: github-issues-open }
+  prs-open:     { type: github-prs-open }
+  contributors: { type: github-contributors }
 
-        - id: image.ghcr
-          kind: shield
-          placement: { between: ["<!-- sf:image:start -->", "<!-- sf:image:end -->"], mode: replace }
-          shield: "badge/ghcr.io-homelabhd%2F{var:repo}-181717?logo=github"
-          link: "https://github.com/{var:github_org}/{var:github_repo}/pkgs/container/{var:repo}"
-        - id: image.docker
-          kind: shield
-          placement: { between: ["<!-- sf:image:start -->", "<!-- sf:image:end -->"], mode: replace }
-          shield: "badge/Docker-{var:org}%2F{var:repo}-2496ED?logo=docker&logoColor=white"
-          link: "https://hub.docker.com/r/{var:org}/{var:repo}"
-        - id: image.pulls
-          kind: badge_ref
-          ref: pulls
-          placement: { between: ["<!-- sf:image:start -->", "<!-- sf:image:end -->"], mode: replace }
+  # ── build-contents (rendered from the build's manifest inventory) ──
+  contents-base: { type: contents, build: osticket, section: inventories.versions, render: badges }
+  contents-apk:  { type: contents, build: osticket, section: inventories.apk, render: badges }
+
+scribe:
+  files:
+    readme.badges:
+      file: "README.md"
+      between: ["<!-- sf:badges:start -->", "<!-- sf:badges:end -->"]
+      inline: true
+      items: [build, license, release, updated, donate, sponsor]
+
+    readme.project:
+      file: "README.md"
+      between: ["<!-- sf:project:start -->", "<!-- sf:project:end -->"]
+      inline: true
+      items: [github, gitlab, last-commit, issues-open, prs-open, contributors]
+
+    readme.image:
+      file: "README.md"
+      between: ["<!-- sf:image:start -->", "<!-- sf:image:end -->"]
+      items: [docker, pulls]
+
+    readme.contents.base:
+      file: "README.md"
+      between: ["<!-- sf:contents-base:start -->", "<!-- sf:contents-base:end -->"]
+      items: [contents-base]
+
+    readme.contents.apk:
+      file: "README.md"
+      between: ["<!-- sf:contents-apk:start -->", "<!-- sf:contents-apk:end -->"]
+      items: [contents-apk]
 
   commit:
     type: docs
     message: "refresh generated docs and badges"
     add:
       - "README.md"
-      - ".stagefreight/badges"
+      - ".stagefreight/scribe"
     push: true
     skip_ci: true
