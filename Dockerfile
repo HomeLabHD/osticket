@@ -77,22 +77,28 @@ RUN set -eux; \
     done; \
     apk del .plugins
 
-# ── Non-root user + all writable paths chowned at BUILD time (no runtime chown) ─────
+# ── Non-root user; writable runtime paths chowned at BUILD time (no runtime chown) ─────
 RUN set -eux; \
     addgroup -g ${PGID} osticket; \
     adduser -u ${PUID} -G osticket -D -H -s /sbin/nologin osticket; \
     # Drop the stock php-fpm pool (it sets user=www-data, which a non-root master can't setuid to).
     rm -f /usr/local/etc/php-fpm.d/www.conf /usr/local/etc/php-fpm.d/www.conf.default; \
     mkdir -p /run/osticket /var/lib/nginx/tmp /var/lib/nginx/logs; \
-    # Rootless + arbitrary-uid (OpenShift pattern): own writable paths by uid 1000 AND
-    # group 0, group-writable — so the image runs as 1000 by default OR any runAsUser
-    # (gid 0) with no root and no runtime chown. osTicket is stateless, so this covers all.
-    # Scope is narrow ON PURPOSE: generated config + runtime state/temp/logs only — NOT
-    # the PHP config tree (mutable config dirs are a bigger trust surface). PHP runtime
-    # overrides are rendered into /run/osticket/php instead (see PHP_INI_SCAN_DIR).
-    for d in /var/www/html/include /run/osticket /var/lib/nginx; do \
+    # Rootless + arbitrary-uid (OpenShift pattern): writable RUNTIME dirs owned by uid 1000 AND
+    # group 0, group-writable — the image runs as 1000 by default OR any runAsUser (gid 0) with
+    # no root and no runtime chown. Scope is narrow ON PURPOSE: generated config + runtime
+    # state/temp/logs only — the PHP config tree and the app code stay read-only.
+    for d in /run/osticket /var/lib/nginx; do \
         chown -R ${PUID}:0 "$d"; chmod -R g+rwX "$d"; \
-    done
+    done; \
+    # App tree owned+readable by uid 1000 / gid 0 but NOT writable, so the container can run
+    # with readOnlyRootFilesystem.
+    chown -R ${PUID}:0 /var/www/html; chmod -R g+rX /var/www/html; \
+    # ost-config.php is osTicket's ONLY runtime write into the app tree. Redirect it OUT of the
+    # read-only code dir to /run/osticket via a symlink — install-seed.php writes THROUGH it to
+    # the writable /run (a deploy-time emptyDir), so include/ needs no runtime write. Created
+    # last, after the recursive chmod (which skips symlinks), so the dangling link is untouched.
+    ln -sf /run/osticket/ost-config.php /var/www/html/include/ost-config.php
 
 # ── Configs (own copies, not vendor scaffolding) ───────────────────────────────────
 COPY rootfs/nginx.conf            /etc/nginx/nginx.conf

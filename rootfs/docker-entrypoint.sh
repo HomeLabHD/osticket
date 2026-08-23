@@ -12,7 +12,9 @@ RUN=/run/osticket
 # works without this, because writable dirs are group-0 + group-writable (set at build).
 if [ "$(id -u)" = "0" ]; then
     PUID="${PUID:-1000}"; PGID="${PGID:-1000}"
-    chown -R "${PUID}:${PGID}" "${RUN}" "${OST_ROOT}/include" 2>/dev/null || true
+    # Only the writable runtime dir needs (re)owning; the app tree (incl. include/) is
+    # read-only, and ost-config.php is symlinked into ${RUN}.
+    chown -R "${PUID}:${PGID}" "${RUN}" 2>/dev/null || true
     exec su-exec "${PUID}:${PGID}" "$0" "$@"
 fi
 
