@@ -211,7 +211,15 @@ stencils:
   license: { label: license, message: "GPL-2.0", color: "#310937", font: monofur, link: LICENSE }
   release: { label: release, message: "v{base}", color: "#74ecbe", font: dejavu-sans, font_size: 11, link: "https://github.com/{var:github_org}/{var:github_repo}/releases" }
   updated: { label: updated, message: "{commit.date}", color: "#236144", font: dejavu-sans, font_size: 11 }
-  pulls:   { label: pulls,   message: "{docker.pulls}", color: "#1d63ed", link: "https://hub.docker.com/r/{var:org}/{var:repo}" }
+  pulls:   { label: pulls,   message: "{registry.dockerhub.pulls}", color: "#1d63ed", link: "https://hub.docker.com/r/{var:org}/{var:repo}" }
+
+  # ── image version row (ghcr-sourced: size/updated read from GHCR's manifest, not Docker Hub) ──
+  release-latest:  { label: latest,     message: "v{base}", color: "#74ecbe", font: dejavu-sans, font_size: 11, link: "https://github.com/{var:github_org}/{var:repo}/pkgs/container/{var:repo}" }
+  release-updated: { label: updated,    message: "{registry.ghcr.tag.v{base}.updated}", color: "#236144", font: dejavu-sans, font_size: 11 }
+  release-size:    { label: size,       message: "{registry.ghcr.tag.v{base}.size}", color: "#555", font: dejavu-sans, font_size: 11, link: "https://github.com/{var:github_org}/{var:repo}/pkgs/container/{var:repo}" }
+  dev-latest:      { label: latest-dev, message: "dev-{{sha}}", color: "#3b82f6", font: dejavu-sans, font_size: 11, link: "https://github.com/{var:github_org}/{var:repo}/pkgs/container/{var:repo}" }
+  dev-updated:     { label: updated,    message: "{registry.ghcr.tag.latest-dev.updated}", color: "#236144", font: dejavu-sans, font_size: 11 }
+  dev-size:        { label: size,       message: "{registry.ghcr.tag.latest-dev.size}", color: "#555", font: dejavu-sans, font_size: 11, link: "https://github.com/{var:github_org}/{var:repo}/pkgs/container/{var:repo}" }
 
   # ── inline shields ──
   donate:  { render: shield, message: donate,  color: "#FF5E5B", logo: ko-fi,          logo_color: white, link: "https://ko-fi.com/T6T41IT163" }
@@ -249,7 +257,7 @@ scribe:
     readme.image:
       file: "README.md"
       between: ["<!-- sf:image:start -->", "<!-- sf:image:end -->"]
-      items: [ghcr, docker, pulls, harbor]
+      items: [ghcr, docker, pulls, harbor, br, release-latest, release-updated, release-size, dev-latest, dev-updated, dev-size]
 
     readme.contents.base:
       file: "README.md"
