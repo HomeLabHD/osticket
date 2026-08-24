@@ -209,7 +209,7 @@ stencils:
   build:   { label: build,   message: "{env:BUILD_STATUS}", color: auto, font: monofur, link: "https://gitlab.prplanit.com/{var:gitlab_group}/{var:repo}/-/pipelines" }
   license: { label: license, message: "GPL-2.0", color: "#310937", font: monofur, link: LICENSE }
   release: { label: release, message: "v{base}", color: "#74ecbe", font: dejavu-sans, font_size: 11, link: "https://github.com/{var:github_org}/{var:github_repo}/releases" }
-  updated: { label: updated, message: "{env:BUILD_DATE}", color: "#236144", font: dejavu-sans, font_size: 11 }
+  updated: { label: updated, message: "{commit.date}", color: "#236144", font: dejavu-sans, font_size: 11 }
   pulls:   { label: pulls,   message: "{docker.pulls}", color: "#1d63ed", link: "https://hub.docker.com/r/{var:org}/{var:repo}" }
 
   # ── inline shields ──
@@ -218,6 +218,8 @@ stencils:
   github:  { render: shield, label: GitHub, message: source, color: "#181717", logo: github, link: "https://github.com/{var:github_org}/{var:github_repo}" }
   gitlab:  { render: shield, label: GitLab, message: source, color: "#FC6D26", logo: gitlab, link: "https://gitlab.prplanit.com/{var:gitlab_group}/{var:repo}" }
   docker:  { render: shield, label: Docker, message: "{var:org}/{var:repo}", color: "#2496ED", logo: docker, logo_color: white, link: "https://hub.docker.com/r/{var:org}/{var:repo}" }
+  ghcr:    { render: shield, label: GHCR,   message: "homelabhd/{var:repo}", color: "#181717", logo: github, logo_color: white, link: "https://github.com/{var:github_org}/{var:repo}/pkgs/container/{var:repo}" }
+  harbor:  { render: shield, label: Harbor, message: "{var:org}/{var:repo}", color: "#60b932", link: "https://cr.pcfae.com/harbor/projects" }
 
   # ── named producers (repo resolves from repos: publish-origin) ──
   last-commit:  { type: github-last-commit }
@@ -246,7 +248,7 @@ scribe:
     readme.image:
       file: "README.md"
       between: ["<!-- sf:image:start -->", "<!-- sf:image:end -->"]
-      items: [docker, pulls]
+      items: [ghcr, docker, pulls, harbor]
 
     readme.contents.base:
       file: "README.md"
