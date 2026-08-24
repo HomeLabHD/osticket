@@ -10,6 +10,8 @@ A **rootless** container image for [osTicket](https://osticket.com/) — the ope
 <!-- sf:badges:end -->
 <!-- sf:image:start -->
 [![GHCR](https://img.shields.io/badge/GHCR-homelabhd%2Fosticket-181717?logo=github&logoColor=white)](https://github.com/HomeLabHD/osticket/pkgs/container/osticket) [![Docker](https://img.shields.io/badge/Docker-hlhd%2Fosticket-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/hlhd/osticket) [![pulls](https://raw.githubusercontent.com/HomeLabHD/osticket/main/.stagefreight/scribe/pulls.svg)](https://hub.docker.com/r/hlhd/osticket) [![Harbor](https://img.shields.io/badge/Harbor-hlhd%2Fosticket-60b932)](https://cr.pcfae.com/harbor/projects)
+
+[![latest](https://raw.githubusercontent.com/HomeLabHD/osticket/main/.stagefreight/scribe/release-latest.svg)](https://github.com/HomeLabHD/osticket/pkgs/container/osticket) ![updated](https://raw.githubusercontent.com/HomeLabHD/osticket/main/.stagefreight/scribe/release-updated.svg) [![size](https://raw.githubusercontent.com/HomeLabHD/osticket/main/.stagefreight/scribe/release-size.svg)](https://github.com/HomeLabHD/osticket/pkgs/container/osticket) [![latest-dev](https://raw.githubusercontent.com/HomeLabHD/osticket/main/.stagefreight/scribe/dev-latest.svg)](https://github.com/HomeLabHD/osticket/pkgs/container/osticket) ![updated](https://raw.githubusercontent.com/HomeLabHD/osticket/main/.stagefreight/scribe/dev-updated.svg) [![size](https://raw.githubusercontent.com/HomeLabHD/osticket/main/.stagefreight/scribe/dev-size.svg)](https://github.com/HomeLabHD/osticket/pkgs/container/osticket)
 <!-- sf:image:end -->
 
 ### Documentation
