@@ -113,6 +113,7 @@ publish:
     readme: README.md
     description:
       - "Rootless osTicket, the FOSS ticketing system — alpine w/ nginx, php-fpm, tini, plugins bundled"
+      - "A rootless (unprivileged, arbitrary-UID) container image for osTicket — the open-source support-ticketing system — nginx + php-fpm under tini, with the official and community plugin set bundled."
     topics: [osticket, ticketing, support, php, rootless, docker]
     when: { branches: [main], events: [push, tag] }
 
