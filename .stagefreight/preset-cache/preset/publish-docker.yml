@@ -1,0 +1,42 @@
+# publish — docker bucket (from osticket, the preferred config): stable/prerelease/dev to
+# dockerhub+ghcr+harbor, project-metadata, release. Build id is the generic 'image'.
+publish:
+  stable:
+    kind: registry
+    registry: [dockerhub, ghcr, harbor]
+    build: image
+    tags: ["v{version}", "latest"]
+    when: { git_tags: [stable], events: [tag] }
+
+  prerelease:
+    kind: registry
+    registry: [dockerhub, ghcr, harbor]
+    build: image
+    tags: ["v{version}"]
+    when: { git_tags: [prerelease], events: [tag] }
+
+  dev:
+    kind: registry
+    registry: [dockerhub, ghcr, harbor]
+    build: image
+    tags: ["dev-{sha:8}", "latest-dev"]
+    when: { branches: [main], events: [push] }
+    retention:
+      keep_last: 6
+      protect: ["latest-dev"]
+
+  project-metadata:
+    kind: metadata
+    registry: [dockerhub, harbor]
+    repos: [primary, github-mirror]
+    readme: README.md
+    when: { branches: [main], events: [push, tag] }
+    # description + topics are per-repo — each satellite declares its own in its
+    # local .stagefreight.yml; the two-file merge combines them with this structure.
+
+  release:
+    kind: release
+    type: latest
+    repos: [primary]
+    aliases: ["v{version}", "latest"]
+    when: { git_tags: [stable], events: [tag] }

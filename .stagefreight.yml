@@ -1,282 +1,125 @@
-version: 1
+# ------------------------------------------------------------------------------
+# GENERATED / ENFORCED BY STAGEFREIGHT GOVERNANCE
+# Source repo: PrPlanIT/MaintenancePolicy
+# Source ref: 814d185bc7dd335963b721170a179791bce141fc
+# Profile: hlhd-docker
+# This .stagefreight.yml is governed, not purely local.
+# To disable governance, detach from the control repo workflow.
+# Manual changes may be overwritten by reconciliation.
+# ------------------------------------------------------------------------------
 
+version: 1
+vars:
+  github_org: HomeLabHD
+  github_repo: osticket
+  gitlab_group: HomeLabHD
+  org: hlhd
+  repo: osticket
+builds:
+  preset: preset/build-docker.yml
+scribe:
+  files:
+    readme.contents.apk:
+      between:
+        - <!-- sf:contents-apk:start -->
+        - <!-- sf:contents-apk:end -->
+      file: README.md
+      items:
+        - contents-apk
+    readme.contents.base:
+      between:
+        - <!-- sf:contents-base:start -->
+        - <!-- sf:contents-base:end -->
+      file: README.md
+      items:
+        - contents-base
+  preset: preset/scribe-docker.yml
+lint:
+  preset: preset/lint-generic.yml
+security:
+  preset: preset/security.yml
+dependency:
+  preset: preset/dependency.yml
+commit:
+  preset: preset/commit.yml
+release:
+  preset: preset/release.yml
+manifest:
+  preset: preset/manifest.yml
+build_cache:
+  preset: preset/build_cache.yml
 ci:
   image: docker.cr.pcfae.com/prplanit/stagefreight:latest-dev
-
-git:
-  branches:
-    main: "^main$"
-  tags:
-    stable:     { pattern: "^v?\\d+\\.\\d+\\.\\d+$" }
-    prerelease: { pattern: "^v?\\d+\\.\\d+\\.\\d+-.+" }
-  versioning:
-    branch_builds:
-      default: { base_from: [stable], format: "{base}-dev+{sha}" }
-    no_lineage: { mode: error }
-
-vars:
-  org: hlhd
-  github_org: HomeLabHD
-  gitlab_group: HomeLabHD
-  repo: osticket
-  github_repo: osticket
-
-builds:
-  # hlhd/osticket — rootless osTicket image (FROM php:fpm-alpine); nginx + php-fpm
-  # under tini. No first-party binary to recycle, so a single docker build.
-  osticket:
-    kind: docker
-    platforms: [linux/amd64]
-
 forges:
-  gitlab:
-    provider: gitlab
-    url: "https://gitlab.prplanit.com"
-    credentials: GITLAB
-
-  github:
-    provider: github
-    url: "https://github.com"
-    credentials: GITHUB
-
+  preset: preset/forges.yml
+git:
+  preset: preset/git.yml
+metadata:
+  category: applications
+  description:
+    - Rootless container image for osTicket, the open-source support ticketing system.
+    - Rootless osTicket image running nginx and php-fpm under a minimal tini init on stock php:8.3-fpm-alpine — runs as uid 1000 and under arbitrary UIDs for hardened clusters, bundles the official and community plugin sets, and leaves cron to a separate scheduled job.
+  license: GPL-2.0
+  org: HomeLabHD
+  title: osTicket
+  topics:
+    - osticket
+    - ticketing
+    - helpdesk
+    - support
+    - php
+    - nginx
+    - rootless
+orgs:
+  HomeLabHD:
+    aliases:
+      docker: hlhd
+      ghcr: homelabhd
+      github: HomeLabHD
+      handle: hlhd
+    maintainer: HomeLabHD <homelabhelp@gmail.com>
+preset_source:
+  cache_policy: authoritative
+  project_id: PrPlanIT/MaintenancePolicy
+  provider: gitlab
+  ref: 814d185bc7dd335963b721170a179791bce141fc
+  repo_url: https://gitlab.prplanit.com
+publish:
+  preset: preset/publish-docker.yml
+registries:
+  preset: preset/registries.yml
 repos:
-  primary:
-    forge: gitlab
-    project: "{var:gitlab_group}/{var:repo}"
-    roles: [primary]
-    branches:
-      default: main
-    worktree: "."
-
   github-mirror:
     forge: github
-    project: "{var:github_org}/{var:github_repo}"
-    roles: [mirror, publish-origin]
+    project: HomeLabHD/osticket
+    roles:
+      - mirror
+      - publish-origin
     sync:
       git: true
       releases: true
-
-registries:
-  dockerhub:
-    provider: docker
-    url: docker.io
-    credentials: DOCKER
-    default_path: "{var:org}/{var:repo}"
-
-  harbor:
-    provider: harbor
-    url: cr.pcfae.com
-    credentials: HARBOR
-    default_path: "{var:org}/{var:repo}"
-
-  # GitHub Container Registry. On GitHub Actions, StageFreight auto-wires GHCR_USER/
-  # GHCR_TOKEN from the runner's GITHUB_TOKEN (packages: write) — no configured secret.
-  ghcr:
-    provider: ghcr
-    url: ghcr.io
-    credentials: GHCR
-    default_path: "homelabhd/{var:repo}"   # ghcr namespace = github owner, lowercased
-
-publish:
-  # ── Stable releases → all registries ──
-  stable:
-    kind: registry
-    registry: [dockerhub, ghcr, harbor]
-    build: osticket
-    tags: ["v{version}", "latest"]
-    when: { git_tags: [stable], events: [tag] }
-
-  # ── Pre-releases → all registries ──
-  prerelease:
-    kind: registry
-    registry: [dockerhub, ghcr, harbor]
-    build: osticket
-    tags: ["v{version}"]
-    when: { git_tags: [prerelease], events: [tag] }
-
-  # ── Dev builds on every commit → all registries (retained/pruned) ──
-  dev:
-    kind: registry
-    registry: [dockerhub, ghcr, harbor]
-    build: osticket
-    tags: ["dev-{sha:8}", "latest-dev"]
-    when: { branches: [main], events: [push] }
-    retention:
-      keep_last: 6
-      protect: ["latest-dev"]
-
-  # ── Project metadata: registry overviews + forge repos ──
-  project-metadata:
-    kind: metadata
-    registry: [dockerhub, harbor]
-    repos: [primary, github-mirror]
-    readme: README.md
-    description:
-      - "Rootless osTicket, the FOSS ticketing system — alpine w/ nginx, php-fpm, tini, plugins bundled."
-      - "A rootless (unprivileged, arbitrary-UID) container image for osTicket — the open-source support-ticketing system — nginx + php-fpm under tini, with the official and community plugin set bundled."
-    topics: [osticket, ticketing, support, php, rootless, docker]
-    when: { branches: [main], events: [push, tag] }
-
-  # ── Release (gitlab primary; projects to github via github-mirror sync.releases) ──
-  release:
-    kind: release
-    type: latest
-    repos: [primary]
-    aliases: ["v{version}", "latest"]
-    when: { git_tags: [stable], events: [tag] }
-
-build_cache:
-  mode: hybrid
-  external:
-    registry: harbor
-    path: "cache"
-    fallback: "main"
-  local:
-    retention:
-      max_age: "7d"
-      max_size: "8GB"
-
-manifest:
-  enabled: true
-  mode: workspace
-
-commit:
-  default_type: docs
-  conventional: true
-  backend: git
-
-dependency:
-  enabled: true
-  output: ".stagefreight/deps"
-  scope:
-    dockerfile_env: true
-  commit:
-    enabled: true
-    type: chore
-    message: "update managed dependencies"
-    push: true
-    skip_ci: false
-
-lint:
-  level: full
-  exclude:
-    - "*.png"
-    - "*.svg"
-    - "*.ico"
-  modules:
-    freshness:
-      enabled: true
-      cache_ttl: 300
-      sources:
-        docker_images: true
-      vulnerability:
-        enabled: true
-    tabs:
-      enabled: true
-    secrets:
-      enabled: true
-    conflicts:
-      enabled: true
-    filesize:
-      enabled: true
-    unicode:
-      enabled: true
-      detect_bidi: true
-      detect_zero_width: true
-      detect_control_ascii: true
-
-release:
-  enabled: true
-  security_summary: true
-  registry_links: true
-
-security:
-  enabled: true
-  output: ".stagefreight/security"
-  sbom: true
-  release_detail: full
-
-toolchains:
-  want:
-    trivy: "0.69.3"
-    syft: "1.42.3"
-    grype: "0.110.0"
-    osv-scanner: "2.3.5"
-    cosign: "3.0.6"
-  retention:
-    keep_last: 2
-
-# stencils: define each renderable once (id → stencil def). Inline defs render a
-# badge (default) or a shield (render: shield); named producers render via type.
+  primary:
+    branches:
+      default: main
+    forge: gitlab
+    project: HomeLabHD/osticket
+    roles:
+      - primary
+    worktree: .
 stencils:
-  # ── generated badges ──
-  build:   { label: build,   message: "{env:BUILD_STATUS}", color: auto, font: monofur, link: "https://gitlab.prplanit.com/{var:gitlab_group}/{var:repo}/-/pipelines" }
-  license: { label: license, message: "GPL-2.0", color: "#310937", font: monofur, link: LICENSE }
-  release: { label: release, message: "v{base}", color: "#74ecbe", font: dejavu-sans, font_size: 11, link: "https://github.com/{var:github_org}/{var:github_repo}/releases" }
-  updated: { label: updated, message: "{commit.date}", color: "#236144", font: dejavu-sans, font_size: 11 }
-  pulls:   { label: pulls,   message: "{registry.dockerhub.pulls}", color: "#1d63ed", link: "https://hub.docker.com/r/{var:org}/{var:repo}" }
-
-  # ── image version row (ghcr-sourced: size/updated read from GHCR's manifest, not Docker Hub) ──
-  release-latest:  { label: latest,     message: "v{base}", color: "#74ecbe", font: dejavu-sans, font_size: 11, link: "https://github.com/{var:github_org}/{var:repo}/pkgs/container/{var:repo}" }
-  release-updated: { label: updated,    message: "{registry.ghcr.tag.v{base}.updated}", color: "#236144", font: dejavu-sans, font_size: 11 }
-  release-size:    { label: size,       message: "{registry.ghcr.tag.v{base}.size}", color: "#555", font: dejavu-sans, font_size: 11, link: "https://github.com/{var:github_org}/{var:repo}/pkgs/container/{var:repo}" }
-  dev-latest:      { label: latest-dev, message: "dev-{{sha}}", color: "#3b82f6", font: dejavu-sans, font_size: 11, link: "https://github.com/{var:github_org}/{var:repo}/pkgs/container/{var:repo}" }
-  dev-updated:     { label: updated,    message: "{registry.ghcr.tag.latest-dev.updated}", color: "#236144", font: dejavu-sans, font_size: 11 }
-  dev-size:        { label: size,       message: "{registry.ghcr.tag.latest-dev.size}", color: "#555", font: dejavu-sans, font_size: 11, link: "https://github.com/{var:github_org}/{var:repo}/pkgs/container/{var:repo}" }
-
-  # ── inline shields ──
-  donate:  { render: shield, message: donate,  color: "#FF5E5B", logo: ko-fi,          logo_color: white, link: "https://ko-fi.com/T6T41IT163" }
-  sponsor: { render: shield, message: sponsor, color: "#EA4AAA", logo: githubsponsors, logo_color: white, link: "https://github.com/sponsors/{var:github_org}" }
-  github:  { render: shield, label: GitHub, message: source, color: "#181717", logo: github, link: "https://github.com/{var:github_org}/{var:github_repo}" }
-  gitlab:  { render: shield, label: GitLab, message: source, color: "#FC6D26", logo: gitlab, link: "https://gitlab.prplanit.com/{var:gitlab_group}/{var:repo}" }
-  docker:  { render: shield, label: Docker, message: "{var:org}/{var:repo}", color: "#2496ED", logo: docker, logo_color: white, link: "https://hub.docker.com/r/{var:org}/{var:repo}" }
-  ghcr:    { render: shield, label: GHCR,   message: "homelabhd/{var:repo}", color: "#181717", logo: github, logo_color: white, link: "https://github.com/{var:github_org}/{var:repo}/pkgs/container/{var:repo}" }
-  harbor:  { render: shield, label: Harbor, message: "{var:org}/{var:repo}", color: "#60b932", link: "https://cr.pcfae.com/harbor/projects" }
-
-  # ── named producers (repo resolves from repos: publish-origin) ──
-  last-commit:  { type: github-last-commit }
-  issues-open:  { type: github-issues-open }
-  prs-open:     { type: github-prs-open }
-  contributors: { type: github-contributors }
-
-  # ── build-contents (rendered from the build's manifest inventory) ──
-  contents-base: { type: contents, build: osticket, section: inventories.versions, render: badges }
-  contents-apk:  { type: contents, build: osticket, section: inventories.apk, render: badges }
-
-scribe:
-  files:
-    readme.badges:
-      file: "README.md"
-      between: ["<!-- sf:badges:start -->", "<!-- sf:badges:end -->"]
-      inline: true
-      items: [build, license, release, updated, donate, sponsor]
-
-    readme.project:
-      file: "README.md"
-      between: ["<!-- sf:project:start -->", "<!-- sf:project:end -->"]
-      inline: true
-      items: [github, gitlab, last-commit, issues-open, prs-open, contributors]
-
-    readme.image:
-      file: "README.md"
-      between: ["<!-- sf:image:start -->", "<!-- sf:image:end -->"]
-      items: [ghcr, docker, pulls, harbor, br, release-latest, release-updated, release-size, dev-latest, dev-updated, dev-size]
-
-    readme.contents.base:
-      file: "README.md"
-      between: ["<!-- sf:contents-base:start -->", "<!-- sf:contents-base:end -->"]
-      items: [contents-base]
-
-    readme.contents.apk:
-      file: "README.md"
-      between: ["<!-- sf:contents-apk:start -->", "<!-- sf:contents-apk:end -->"]
-      items: [contents-apk]
-
-  commit:
-    type: docs
-    message: "refresh generated docs and badges"
-    add:
-      - "README.md"
-      - ".stagefreight/scribe"
-    push: true
-    skip_ci: true
+  contents-apk:
+    build: osticket
+    render: badges
+    section: inventories.apk
+    type: contents
+  contents-base:
+    build: osticket
+    render: badges
+    section: inventories.versions
+    type: contents
+  presets:
+    - preset/stencils-base.yml
+    - preset/stencils-status.yml
+    - preset/stencils-docker.yml
+toolchains:
+  preset: preset/toolchains.yml
