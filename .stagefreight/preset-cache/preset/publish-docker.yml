@@ -40,3 +40,15 @@ publish:
     repos: [primary]
     aliases: ["v{version}", "latest"]
     when: { git_tags: [stable], events: [tag] }
+
+  # A forge release for every main push, so the current dev image is reachable from the
+  # repo and not only from a registry tag someone has to know to look for. Kept to the
+  # last 2: a dev release is a pointer to "what main is right now", so history beyond
+  # the previous one is noise that buries the stable releases in the same list.
+  dev-release:
+    kind: release
+    type: prerelease
+    repos: [primary]
+    when: { branches: [main], events: [push] }
+    retention:
+      keep_last: 2
