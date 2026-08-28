@@ -22,8 +22,7 @@ publish:
     tags: ["dev-{sha:8}", "latest-dev"]
     when: { branches: [main], events: [push] }
     retention:
-      keep_last: 6
-      protect: ["latest-dev"]
+      keep_last: 2   # latest-dev is rolling (no sequence var) → auto-exempt, no protect needed
 
   project-metadata:
     kind: metadata
