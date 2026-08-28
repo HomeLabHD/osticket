@@ -48,6 +48,12 @@ publish:
     kind: release
     type: prerelease
     repos: [primary]
+    # A main push carries no tag, and a release must attach to one — without tag: the
+    # target resolves to nothing and silently produces no release at all. dev-{sha:8}
+    # is the immutable generation; latest-dev is the rolling alias that always points
+    # at the current one, mirroring the image tags this repo already publishes.
+    tag: "dev-{sha:8}"
+    aliases: ["latest-dev"]
     when: { branches: [main], events: [push] }
     retention:
       keep_last: 2
