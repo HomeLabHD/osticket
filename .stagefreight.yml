@@ -1,7 +1,7 @@
 # ------------------------------------------------------------------------------
 # GENERATED / ENFORCED BY STAGEFREIGHT GOVERNANCE
 # Source repo: PrPlanIT/MaintenancePolicy
-# Source ref: 44ce7931b90a3386783ed4f03a822f98eb8128de
+# Source ref: 11066049d06cb0e071409a80bc96411b0a899d1e
 # Profile: hlhd-docker
 # This .stagefreight.yml is governed, not purely local.
 # To disable governance, detach from the control repo workflow.
@@ -18,21 +18,6 @@ vars:
 builds:
   preset: preset/build-docker.yml
 scribe:
-  files:
-    readme.contents.apk:
-      between:
-        - <!-- sf:contents-apk:start -->
-        - <!-- sf:contents-apk:end -->
-      file: README.md
-      items:
-        - contents-apk
-    readme.contents.base:
-      between:
-        - <!-- sf:contents-base:start -->
-        - <!-- sf:contents-base:end -->
-      file: README.md
-      items:
-        - contents-base
   preset: preset/scribe-docker.yml
 lint:
   preset: preset/lint-generic.yml
@@ -84,7 +69,7 @@ preset_source:
   cache_policy: authoritative
   project_id: PrPlanIT/MaintenancePolicy
   provider: gitlab
-  ref: 44ce7931b90a3386783ed4f03a822f98eb8128de
+  ref: 11066049d06cb0e071409a80bc96411b0a899d1e
   repo_url: https://gitlab.prplanit.com
 publish:
   preset: preset/publish-docker.yml
@@ -109,16 +94,6 @@ repos:
       - primary
     worktree: .
 stencils:
-  contents-apk:
-    build: image
-    render: badges
-    section: inventories.apk
-    type: contents
-  contents-base:
-    build: image
-    render: badges
-    section: inventories.versions
-    type: contents
   presets:
     - preset/stencils-base.yml
     - preset/stencils-status.yml

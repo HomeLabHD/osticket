@@ -16,3 +16,10 @@ stencils:
   dev-latest:      { label: latest-dev, message: "dev-{sha:8}", color: "#3b82f6", font: dejavu-sans, font_size: 11, link: "https://github.com/{path.github}/pkgs/container/{slug.lower}" }
   dev-updated:     { label: updated, message: "{registry.ghcr.tag.latest-dev.updated}", color: "#236144", font: dejavu-sans, font_size: 11 }
   dev-size:        { label: size, message: "{registry.ghcr.tag.latest-dev.size}", color: "#555", font: dejavu-sans, font_size: 11, link: "https://github.com/{path.github}/pkgs/container/{slug.lower}" }
+
+  # Build-manifest inventories. Shared because nearly every image wants to show what
+  # it contains; a repo whose README lacks the markers simply renders nothing (scribe
+  # warns, never fails), and an image with more inventories (ansible: pip/galaxy/
+  # binaries) adds them in its own catalog entry.
+  contents-base: { type: contents, build: image, section: inventories.versions, render: badges }
+  contents-apk:  { type: contents, build: image, section: inventories.apk, render: badges }
