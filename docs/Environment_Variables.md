@@ -37,6 +37,8 @@ Either way the secret stays out of plaintext env and out of source control.
 | Variable    | Required | Default | Description |
 |-------------|----------|---------|-------------|
 | `HTTP_PORT` | no       | `8080`  | Port nginx listens on inside the container. |
+| `TRUSTED_PROXIES` | no | *(unset)* | Space/comma-separated CIDRs of trusted front proxies / load-balancers. When set, nginx (`real_ip`) takes the client address from `REALIP_HEADER` so logs, `REMOTE_ADDR`, osTicket's system log, and ticket IPs record the real client, not the proxy. Empty ⇒ no proxy is trusted (records the direct peer). Deployment-specific — keep it in your env, never in the image. |
+| `REALIP_HEADER` | no | `X-Real-IP` | Header nginx reads the client IP from when `TRUSTED_PROXIES` is set. |
 
 > ⚠️ **Rootless by default.** This image runs as a **non-root** user (uid 1000), and an
 > unprivileged process **cannot bind a port below 1024**. The default `8080` works
@@ -54,6 +56,25 @@ Either way the secret stays out of plaintext env and out of source control.
 
 `EXPOSE` in the image is `8080` (the default); overriding `HTTP_PORT` changes the actual
 listener, and the healthcheck follows it automatically.
+
+### Real client IP & brute-force detection
+
+Behind a reverse proxy, load-balancer, or service mesh the container sees the **proxy's**
+address, not the visitor's. Set `TRUSTED_PROXIES` to the proxy CIDR(s) so nginx rewrites
+`$remote_addr` from `REALIP_HEADER` (default `X-Real-IP`). The trusted ranges are **your**
+deployment's, so they belong in your env, never baked into the image. Only trust proxies
+you control, and make that proxy **overwrite** (not append) the header so a client cannot
+spoof it.
+
+Every failed login is written to **stderr** as one JSON line for fail2ban / CrowdSec to
+consume (the attempted password is never logged):
+
+```json
+{"log":"osticket_auth","event":"login_failed","ip":"<client>","user":"<attempted>"}
+```
+
+`ip` is the real client when `TRUSTED_PROXIES` is set. The username is `json_encode`-escaped,
+so a hostile value cannot forge fields or break the line.
 
 ---
 
