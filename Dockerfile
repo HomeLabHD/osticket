@@ -78,6 +78,20 @@ RUN set -eux; \
     done; \
     apk del .plugins
 
+# ── Fork patch: emit every failed login to stderr for CrowdSec brute-force detection ──
+# Generic (no environment specifics): emits one JSON line per failed login — json_encode
+# escapes the username so no value can forge a field (injection-proof), and the password
+# is never included. Applied BEFORE the read-only chmod below so the tree stays immutable.
+# Fails the build loudly if it no longer applies (a future osTicket bump that moved the
+# auth.login.failed signal) — a silent no-op would leave brute-force detection blind.
+COPY patches/crowdsec-auth-stderr.patch /tmp/crowdsec-auth-stderr.patch
+RUN set -eux; \
+    apk add --no-cache --virtual .patch patch; \
+    patch -p1 -d /var/www/html < /tmp/crowdsec-auth-stderr.patch; \
+    php -l /var/www/html/include/class.auth.php; \
+    apk del .patch; \
+    rm -f /tmp/crowdsec-auth-stderr.patch
+
 # ── Non-root user; writable runtime paths chowned at BUILD time (no runtime chown) ─────
 RUN set -eux; \
     addgroup -g ${PGID} osticket; \
@@ -129,7 +143,12 @@ ENV PHP_INI_SCAN_DIR=/usr/local/etc/php/conf.d:/run/osticket/php \
     PHP_MEMORY_LIMIT=256M \
     PHP_UPLOAD_MAX_SIZE=25M \
     OSTICKET_ENFORCE_EXTERNAL_CRON=1 \
+    REALIP_HEADER=X-Real-IP \
     TZ=UTC
+# TRUSTED_PROXIES is intentionally UNSET by default: trusted proxy/LB CIDRs are
+# environment-specific and must come from the deploy, never be baked into the image.
+# Set it (space/comma-separated CIDRs) when running behind a trusted proxy/mesh so nginx
+# records the real client from REALIP_HEADER. Empty => nginx trusts no proxy.
 
 USER ${PUID}:${PGID}
 WORKDIR /var/www/html

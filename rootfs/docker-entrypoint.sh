@@ -56,6 +56,21 @@ mkdir -p "${RUN}/nginx/client_body" "${RUN}/nginx/proxy" "${RUN}/nginx/fastcgi" 
          "${RUN}/nginx/uwsgi" "${RUN}/nginx/scgi"
 sed "s/__HTTP_PORT__/${HTTP_PORT}/" /etc/nginx/nginx.conf > "${RUN}/nginx.conf"
 
+# ── Real-IP include: generate nginx set_real_ip_from lines from $TRUSTED_PROXIES. ────
+# Trusted proxy ranges are per-environment, so they are supplied at deploy time, NOT
+# baked into the image. Empty (the default) => empty file => nginx trusts no proxy and
+# records the direct peer. When set (space/comma-separated CIDRs), $remote_addr becomes
+# the client from ${REALIP_HEADER} (default X-Real-IP). nginx include of realip.conf is
+# unconditional, so this file must always exist (even empty).
+: > "${RUN}/realip.conf"
+if [ -n "${TRUSTED_PROXIES:-}" ]; then
+    for _cidr in $(echo "${TRUSTED_PROXIES}" | tr ',' ' '); do
+        [ -n "${_cidr}" ] && echo "set_real_ip_from ${_cidr};" >> "${RUN}/realip.conf"
+    done
+    echo "real_ip_header ${REALIP_HEADER:-X-Real-IP};" >> "${RUN}/realip.conf"
+    echo "[entrypoint] real_ip: trusting ${TRUSTED_PROXIES} via ${REALIP_HEADER:-X-Real-IP}"
+fi
+
 db() { mariadb -h"${DB_HOST}" -P"${DB_PORT}" -u"${DB_USER}" -p"${DB_PASS}" "$@"; }
 
 # ── Wait for the database. ───────────────────────────────────────────────────────────

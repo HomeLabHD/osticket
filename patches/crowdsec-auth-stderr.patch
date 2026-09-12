@@ -1,0 +1,26 @@
+--- a/include/class.auth.php
++++ b/include/class.auth.php
+@@ -363,6 +363,23 @@
+ 
+         $info = array('username' => $username, 'password' => $password);
+         Signal::send('auth.login.failed', null, $info);
++        // HomeLabHD: surface every failed login as one JSON line on stderr for
++        // CrowdSec brute-force detection. json_encode escapes the username, so no
++        // value can break the line or forge a field (injection-proof by construction);
++        // INVALID_UTF8_SUBSTITUTE keeps it from ever returning false on bad input; the
++        // password is never included. $_SERVER['REMOTE_ADDR'] is the real client via
++        // nginx real_ip (X-Real-Ip from the deployment's realip config).
++        $__cs_ip = $_SERVER['REMOTE_ADDR'] ?? '';
++        if ($__cs_ip !== '') {
++            $__cs_line = json_encode(array(
++                'log'   => 'osticket_auth',
++                'event' => 'login_failed',
++                'ip'    => $__cs_ip,
++                'user'  => substr((string) $username, 0, 128),
++            ), JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE);
++            if ($__cs_line !== false)
++                @file_put_contents('php://stderr', $__cs_line."\n");
++        }
+         self::authAudit($result, $info);
+     }
+ 
