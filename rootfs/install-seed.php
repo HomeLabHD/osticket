@@ -107,8 +107,25 @@ seed_log("connecting to mysql://{$dbuser}@{$dbhost}:{$dbport}/{$dbname}");
 if (!db_connect($dbhost, $dbuser, $dbpass))
     seed_die('unable to connect to MySQL: ' . db_connect_error());
 
-$installed = db_select_database($dbname)
-    && db_query('SELECT 1 FROM `' . $prefix . 'config` LIMIT 1', false);
+// The Installer drops tables, so it runs only on proof of an empty schema; any error or
+// partial schema stops the boot and leaves the database untouched.
+try {
+    if (!db_select_database($dbname))
+        seed_die("cannot select database {$dbname}: " . db_error());
+    $count = function ($where) use ($dbname) {
+        $res = db_query("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = "
+            . db_real_escape($dbname, true) . $where, false);
+        if (!$res || !($row = db_fetch_row($res)))
+            seed_die('cannot read the schema, refusing to decide install state: ' . db_error());
+        return (int) $row[0];
+    };
+    $tables = $count('');
+    $installed = $count(' AND TABLE_NAME = ' . db_real_escape($prefix . 'config', true)) === 1;
+} catch (\Throwable $ex) {
+    seed_die('cannot read the schema, refusing to decide install state: ' . $ex->getMessage());
+}
+if (!$installed && $tables > 0)
+    seed_die("{$dbname} has {$tables} tables but no {$prefix}config, refusing to install over it.");
 
 // ── Write ost-config.php from the 1.18 sample with the real placeholders filled. ────
 seed_log('writing ' . OSTICKET_CONFIGFILE . ' from sample');
