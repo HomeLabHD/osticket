@@ -58,6 +58,10 @@ RUN set -eux; \
     rm -rf /usr/src/osticket-plugins/.git; \
     cp -a /usr/src/osticket-plugins/. "$PLUGINS/"; \
     rm -rf /usr/src/osticket-plugins; \
+    # psr/http-factory declares Psr\Http\Message, but auth-oauth2's map files it under Psr/Http/Factory.
+    PSR="$PLUGINS/auth-oauth2/lib/Psr/Http"; \
+    mv "$PSR"/Factory/*.php "$PSR/Message/"; rmdir "$PSR/Factory"; \
+    test -f "$PSR/Message/RequestFactoryInterface.php"; \
     for spec in \
         "clonemeagain/osticket-plugin-archiver:archiver" \
         "clonemeagain/attachment_preview:attachment-preview" \
