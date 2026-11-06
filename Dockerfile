@@ -16,6 +16,7 @@ ARG PGID=1000
 # image.description is owned by StageFreight (stamped from project-metadata.description every
 # build), so it stays the single source across the image label, registry overview, and forge.
 LABEL org.opencontainers.image.title="osticket" \
+      org.osticket.version="${OSTICKET_VERSION}" \
       org.opencontainers.image.source="https://github.com/HomeLabHD/osticket"
 
 # ── PHP extensions + nginx + tini ───────────────────────────────────────────────
