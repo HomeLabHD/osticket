@@ -86,6 +86,11 @@ repos:
     roles:
       - primary
     worktree: .
+schedules:
+  upstream-refresh:
+    build: changes
+    cron: H H * * *
+    reason: Daily watch of osTicket/osTicket; move to its new release.
 stencils:
   presets:
     - https://git.optcp.com/PrPlanIT/MaintenancePolicy//preset/stencils-base.yml
@@ -96,3 +101,19 @@ toolchains:
   want:
     presets:
       - https://git.optcp.com/PrPlanIT/MaintenancePolicy//preset/toolchains-scanners.yml
+upstream:
+  evidence:
+    image:
+      probe:
+        label: org.osticket.version
+  sources:
+    osticket:
+      git: https://github.com/osTicket/osTicket
+      pins:
+        - arg: OSTICKET_VERSION
+          file: Dockerfile
+      select:
+        tags: ^v(?P<version>\d+\.\d+\.\d+)$
+  version:
+    since: v1.18.4
+    track: osticket
