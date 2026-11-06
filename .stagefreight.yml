@@ -87,10 +87,7 @@ repos:
       - primary
     worktree: .
 schedules:
-  upstream-refresh:
-    build: changes
-    cron: H H * * *
-    reason: Daily watch of osTicket/osTicket; move to its new release.
+  preset: https://git.optcp.com/PrPlanIT/MaintenancePolicy//preset/schedules-upstream.yml
 stencils:
   presets:
     - https://git.optcp.com/PrPlanIT/MaintenancePolicy//preset/stencils-base.yml

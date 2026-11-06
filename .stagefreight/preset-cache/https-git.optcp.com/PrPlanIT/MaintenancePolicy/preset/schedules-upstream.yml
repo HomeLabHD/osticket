@@ -1,0 +1,5 @@
+schedules:
+  upstream-refresh:
+    cron: "H H * * *"
+    build: changes
+    reason: "Daily watch of the upstream release."
