@@ -8,6 +8,7 @@
 # auto-patches within 8.3 each build; the dep updater must not bump the minor.
 FROM php:8.3.36-fpm-alpine
 
+# renovate: datasource=github-tags depName=osTicket/osTicket extractVersion=^v(?<version>\d+\.\d+\.\d+)$
 ARG OSTICKET_VERSION=1.18.4
 ARG OSTICKET_PLUGINS_VERSION=develop
 ARG PUID=1000
