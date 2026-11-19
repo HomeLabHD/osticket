@@ -101,16 +101,14 @@ toolchains:
 upstream:
   evidence:
     image:
-      probe:
-        label: org.osticket.version
+      label: org.osticket.version
   sources:
     osticket:
       git: https://github.com/osTicket/osTicket
       pins:
         - arg: OSTICKET_VERSION
           file: Dockerfile
-      select:
-        tags: ^v(?P<version>\d+\.\d+\.\d+)$
+      tags: ^v(?P<version>\d+\.\d+\.\d+)$
   version:
     since: v1.18.4
     track: osticket
