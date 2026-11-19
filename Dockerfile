@@ -6,7 +6,7 @@
 # PHP pinned to 8.3 ON PURPOSE: osTicket needs the imap extension, which was removed from
 # PHP core in 8.4 (8.4+ breaks `docker-php-ext-install imap`). The moving 8.3 tag
 # auto-patches within 8.3 each build; the dep updater must not bump the minor.
-FROM php:8.3.36-fpm-alpine
+FROM php:8.3.37-fpm-alpine
 
 # renovate: datasource=github-tags depName=osTicket/osTicket extractVersion=^v(?<version>\d+\.\d+\.\d+)$
 ARG OSTICKET_VERSION=1.18.4
