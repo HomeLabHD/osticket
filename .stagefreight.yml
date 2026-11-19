@@ -45,7 +45,6 @@ metadata:
   description:
     - Rootless container image for osTicket, the open-source support ticketing system.
     - Rootless osTicket image running nginx and php-fpm under a minimal tini init on stock php:8.3-fpm-alpine — runs as uid 1000 and under arbitrary UIDs for hardened clusters, bundles the official and community plugin sets, and leaves cron to a separate scheduled job.
-  license: GPL-2.0
   org: HomeLabHD
   title: osTicket
   topics:
@@ -102,13 +101,6 @@ upstream:
   evidence:
     image:
       label: org.osticket.version
-  sources:
-    osticket:
-      git: https://github.com/osTicket/osTicket
-      pins:
-        - arg: OSTICKET_VERSION
-          file: Dockerfile
-      tags: ^v(?P<version>\d+\.\d+\.\d+)$
   version:
     since: v1.18.4
     track: osticket
